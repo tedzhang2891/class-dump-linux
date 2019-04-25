@@ -1,1737 +1,1161 @@
-/*
- * Copyright (c) 1999-2007 Apple Inc.  All Rights Reserved.
- * 
- * @APPLE_LICENSE_HEADER_START@
- * 
- * This file contains Original Code and/or Modifications of Original Code
- * as defined in and that are subject to the Apple Public Source License
- * Version 2.0 (the 'License'). You may not use this file except in
- * compliance with the License. Please obtain a copy of the License at
- * http://www.opensource.apple.com/apsl/ and read it before using this
- * file.
- * 
- * The Original Code and all software distributed under the License are
- * distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
- * EXPRESS OR IMPLIED, AND APPLE HEREBY DISCLAIMS ALL SUCH WARRANTIES,
- * INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR NON-INFRINGEMENT.
- * Please see the License for the specific language governing rights and
- * limitations under the License.
- * 
- * @APPLE_LICENSE_HEADER_END@
- */
+#if defined(__clang__) && !defined(__OBJC_RUNTIME_INTERNAL__)
+#pragma clang system_header
+#endif
+#include "objc-visibility.h"
 
-#ifndef _OBJC_RUNTIME_H
-#define _OBJC_RUNTIME_H
+#ifndef __LIBOBJC_RUNTIME_H_INCLUDED__
+#define __LIBOBJC_RUNTIME_H_INCLUDED__
 
-#include <objc/objc.h>
-#include <stdarg.h>
-#include <stdint.h>
-#include <stddef.h>
-#include <Availability.h>
-#include <TargetConditionals.h>
-
-#if TARGET_OS_MAC
-#include <sys/types.h>
+#ifdef __cplusplus
+extern "C" {
 #endif
 
+#ifndef __GNUSTEP_RUNTIME__
+#	define __GNUSTEP_RUNTIME__
+#endif
 
-/* Types */
+#ifndef __has_feature
+#	define __has_feature(x) 0
+#endif
 
-#if !OBJC_TYPES_DEFINED
+#ifndef __unsafe_unretained
+#	ifndef __has_feature
+#		define __unsafe_unretained
+#	elif !__has_feature(objc_arc)
+#		define __unsafe_unretained
+#	endif
+#endif
 
-/// An opaque type that represents a method in a class definition.
+// Make sure we get the limit macros, even in C++ mode
+#ifndef __STDC_LIMIT_MACROS                                                     
+#	define __STDC_LIMIT_MACROS 1
+#endif
+
+#include <stdint.h>
+#include <limits.h>
+#include <stddef.h>
+#include <sys/types.h>
+#include "Availability.h"
+
+// Undo GNUstep substitutions
+#ifdef class_setVersion
+#	undef class_setVersion
+#endif
+#ifdef class_getClassMethod
+#	undef class_getClassMethod
+#endif
+#ifdef objc_getClass
+#	undef objc_getClass
+#endif
+#ifdef objc_lookUpClass
+#	undef objc_lookUpClass
+#endif
+
+/**
+ * Opaque type for Objective-C instance variable metadata.
+ */
+typedef struct objc_ivar* Ivar;
+
+// Don't redefine these types if the old GCC header was included first.
+#ifndef __objc_INCLUDE_GNU
+// Define the macro so that including the old GCC header does nothing.
+#	define __objc_INCLUDE_GNU
+#	define __objc_api_INCLUDE_GNU
+
+
+/**
+ * Opaque type used for selectors.
+ */
+#if !defined(__clang__) && !defined(__OBJC_RUNTIME_INTERNAL__)
+typedef const struct objc_selector *SEL;
+#else
+typedef struct objc_selector *SEL;
+#endif
+
+/**
+ * Opaque type for Objective-C classes.
+ */
+typedef struct objc_class *Class;
+
+/**
+ * Type for Objective-C objects.
+ */
+typedef struct objc_object
+{
+	/**
+	 * Pointer to this object's class.  Accessing this directly is STRONGLY
+	 * discouraged.  You are recommended to use object_getClass() instead.
+	 */
+#ifndef __OBJC_RUNTIME_INTERNAL__
+	__attribute__((deprecated))
+#endif
+	Class isa;
+} *id;
+
+/**
+ * Structure used for calling superclass methods.
+ */
+struct objc_super
+{
+	/** The receiver of the message. */
+	__unsafe_unretained id receiver;
+	/** The class containing the method to call. */
+#	if !defined(__cplusplus)  &&  !__OBJC2__
+	Class class;
+#	else
+	Class super_class;
+#	endif
+};
+
+/**
+ * Instance Method Pointer type.  Note: Since the calling convention for
+ * variadic functions sometimes differs from the calling convention for
+ * non-variadic functions, you must cast an IMP to the correct type before
+ * calling.
+ */
+typedef id (*IMP)(id, SEL, ...);
+/**
+ * Opaque type for Objective-C method metadata.
+ */
 typedef struct objc_method *Method;
 
-/// An opaque type that represents an instance variable.
-typedef struct objc_ivar *Ivar;
+/**
+ * Objective-C boolean type.
+ */
+#	ifdef STRICT_APPLE_COMPATIBILITY
+typedef signed char BOOL;
+#	else
+#		if defined(__vxworks) || defined(_WIN32)
+typedef  int BOOL;
+#		else
+typedef unsigned char BOOL;
+#		endif
+#	endif
 
-/// An opaque type that represents a category.
-typedef struct objc_category *Category;
+#else
+// Method in the GCC runtime is a struct, Method_t is the pointer
+#	define Method Method_t
+#endif // __objc_INCLUDE_GNU
 
-/// An opaque type that represents an Objective-C declared property.
-typedef struct objc_property *objc_property_t;
 
-struct objc_class {
-    Class _Nonnull isa  OBJC_ISA_AVAILABILITY;
-
-#if !__OBJC2__
-    Class _Nullable super_class                              OBJC2_UNAVAILABLE;
-    const char * _Nonnull name                               OBJC2_UNAVAILABLE;
-    long version                                             OBJC2_UNAVAILABLE;
-    long info                                                OBJC2_UNAVAILABLE;
-    long instance_size                                       OBJC2_UNAVAILABLE;
-    struct objc_ivar_list * _Nullable ivars                  OBJC2_UNAVAILABLE;
-    struct objc_method_list * _Nullable * _Nullable methodLists                    OBJC2_UNAVAILABLE;
-    struct objc_cache * _Nonnull cache                       OBJC2_UNAVAILABLE;
-    struct objc_protocol_list * _Nullable protocols          OBJC2_UNAVAILABLE;
-#endif
-
-} OBJC2_UNAVAILABLE;
-/* Use `Class` instead of `struct objc_class *` */
-
-#endif
-
+/**
+ * Opaque type for Objective-C property metadata.
+ */
+typedef struct objc_property* objc_property_t;
+/**
+ * Opaque type for Objective-C protocols.  Note that, although protocols are
+ * objects, sending messages to them is deprecated in Objective-C 2 and may not
+ * work in the future.
+ */
 #ifdef __OBJC__
 @class Protocol;
 #else
-typedef struct objc_object Protocol;
+typedef struct objc_protocol Protocol;
 #endif
 
-/// Defines a method
-struct objc_method_description {
-    SEL _Nullable name;               /**< The name of the method */
-    char * _Nullable types;           /**< The types of the method arguments */
+/**
+ * Objective-C method description.
+ */
+struct objc_method_description
+{
+	/**
+	 * The name of this method.
+	 */
+	SEL   name;
+	/**
+	 * The types of this method.
+	 */
+	const char *types;
 };
 
-/// Defines a property attribute
-typedef struct {
-    const char * _Nonnull name;           /**< The name of the attribute */
-    const char * _Nonnull value;          /**< The value of the attribute (usually empty) */
+/**
+ * The objc_property_attribute_t type is used to store attributes for
+ * properties.  This is used to store a decomposed version of the property
+ * encoding, with each flag stored in the name and each value in the value.
+ *
+ * All of the strings that these refer to are internal to the runtime and
+ * should not be freed.
+ */
+typedef struct
+{
+	/**
+	 * The flag that this attribute describes.  All current flags are single characters,
+	 */
+	const char *name;
+	/**
+	 */
+	const char *value;
 } objc_property_attribute_t;
 
 
-/* Functions */
 
-/* Working with Instances */
+#ifndef YES
+#	define YES ((BOOL)1)
+#endif
+#ifndef NO
+#	define NO ((BOOL)0)
+#endif
 
-/** 
- * Returns a copy of a given object.
- * 
- * @param obj An Objective-C object.
- * @param size The size of the object \e obj.
- * 
- * @return A copy of \e obj.
+#ifdef __GNUC
+#	define _OBJC_NULL_PTR __null
+#elif defined(__cplusplus)
+#	if __has_feature(cxx_nullptr)
+#		define _OBJC_NULL_PTR nullptr
+#	else
+#		define _OBJC_NULL_PTR 0
+#	endif
+#else
+#	define _OBJC_NULL_PTR ((void*)0)
+#endif
+
+#ifndef nil
+#	define nil ((id)_OBJC_NULL_PTR)
+#endif
+
+#ifndef Nil
+#	define Nil ((Class)_OBJC_NULL_PTR)
+#endif
+
+#include "slot.h"
+#include "message.h"
+
+
+/**
+ * Adds an instance variable to the named class.  The class must not have been
+ * registered by the runtime.  The alignment must be the base-2 logarithm of
+ * the alignment requirement and the types should be an Objective-C type encoding.
  */
-OBJC_EXPORT id _Nullable object_copy(id _Nullable obj, size_t size)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0)
-    OBJC_ARC_UNAVAILABLE;
+OBJC_PUBLIC
+BOOL class_addIvar(Class cls,
+                   const char *name,
+                   size_t size,
+                   uint8_t alignment,
+                   const char *types);
 
-/** 
- * Frees the memory occupied by a given object.
- * 
- * @param obj An Objective-C object.
- * 
- * @return nil
+/**
+ * Adds a method to the class.
  */
-OBJC_EXPORT id _Nullable
-object_dispose(id _Nullable obj)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0)
-    OBJC_ARC_UNAVAILABLE;
+OBJC_PUBLIC
+BOOL class_addMethod(Class cls, SEL name, IMP imp, const char *types);
 
-/** 
- * Returns the class of an object.
- * 
- * @param obj The object you want to inspect.
- * 
- * @return The class object of which \e object is an instance, 
- *  or \c Nil if \e object is \c nil.
+/**
+ * Adds a protocol to the class.
  */
-OBJC_EXPORT Class _Nullable
-object_getClass(id _Nullable obj) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+BOOL class_addProtocol(Class cls, Protocol *protocol);
 
-/** 
- * Sets the class of an object.
- * 
- * @param obj The object to modify.
- * @param cls A class object.
- * 
- * @return The previous value of \e object's class, or \c Nil if \e object is \c nil.
+/**
+ * Tests for protocol conformance.  Note: Currently, protocols with the same
+ * name are regarded as equivalent, even if they have different methods.  This
+ * behaviour will change in a future version.
  */
-OBJC_EXPORT Class _Nullable
-object_setClass(id _Nullable obj, Class _Nonnull cls) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+BOOL class_conformsToProtocol(Class cls, Protocol *protocol);
 
-
-/** 
- * Returns whether an object is a class object.
- * 
- * @param obj An Objective-C object.
- * 
- * @return true if the object is a class or metaclass, false otherwise.
+/**
+ * Copies the instance variable list for this class.  The integer pointed to by
+ * the outCount argument is set to the number of instance variables returned.
+ * The caller is responsible for freeing the returned buffer.
  */
-OBJC_EXPORT BOOL
-object_isClass(id _Nullable obj)
-    OBJC_AVAILABLE(10.10, 8.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+Ivar* class_copyIvarList(Class cls, unsigned int *outCount);
 
-
-/** 
- * Reads the value of an instance variable in an object.
- * 
- * @param obj The object containing the instance variable whose value you want to read.
- * @param ivar The Ivar describing the instance variable whose value you want to read.
- * 
- * @return The value of the instance variable specified by \e ivar, or \c nil if \e object is \c nil.
- * 
- * @note \c object_getIvar is faster than \c object_getInstanceVariable if the Ivar
- *  for the instance variable is already known.
+/**
+ * Copies the method list for this class.  The integer pointed to by the
+ * outCount argument is set to the number of methods returned.  The caller is
+ * responsible for freeing the returned buffer.
  */
-OBJC_EXPORT id _Nullable
-object_getIvar(id _Nullable obj, Ivar _Nonnull ivar) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+Method * class_copyMethodList(Class cls, unsigned int *outCount);
 
-/** 
- * Sets the value of an instance variable in an object.
- * 
- * @param obj The object containing the instance variable whose value you want to set.
- * @param ivar The Ivar describing the instance variable whose value you want to set.
- * @param value The new value for the instance variable.
- * 
- * @note Instance variables with known memory management (such as ARC strong and weak)
- *  use that memory management. Instance variables with unknown memory management 
- *  are assigned as if they were unsafe_unretained.
- * @note \c object_setIvar is faster than \c object_setInstanceVariable if the Ivar
- *  for the instance variable is already known.
+/**
+ * Copies the declared property list for this class.  The integer pointed to by
+ * the outCount argument is set to the number of declared properties returned.
+ * The caller is responsible for freeing the returned buffer.
  */
-OBJC_EXPORT void
-object_setIvar(id _Nullable obj, Ivar _Nonnull ivar, id _Nullable value) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount);
 
-/** 
- * Sets the value of an instance variable in an object.
- * 
- * @param obj The object containing the instance variable whose value you want to set.
- * @param ivar The Ivar describing the instance variable whose value you want to set.
- * @param value The new value for the instance variable.
- * 
- * @note Instance variables with known memory management (such as ARC strong and weak)
- *  use that memory management. Instance variables with unknown memory management 
- *  are assigned as if they were strong.
- * @note \c object_setIvar is faster than \c object_setInstanceVariable if the Ivar
- *  for the instance variable is already known.
+/**
+ * Copies the protocol list for this class.  The integer pointed to by the
+ * outCount argument is set to the number of protocols returned.  The caller is
+ * responsible for freeing the returned buffer.
  */
-OBJC_EXPORT void
-object_setIvarWithStrongDefault(id _Nullable obj, Ivar _Nonnull ivar,
-                                id _Nullable value) 
-    OBJC_AVAILABLE(10.12, 10.0, 10.0, 3.0, 2.0);
+OBJC_PUBLIC
+Protocol *__unsafe_unretained* class_copyProtocolList(Class cls, unsigned int *outCount);
 
-/** 
- * Changes the value of an instance variable of a class instance.
- * 
- * @param obj A pointer to an instance of a class. Pass the object containing
- *  the instance variable whose value you wish to modify.
- * @param name A C string. Pass the name of the instance variable whose value you wish to modify.
- * @param value The new value for the instance variable.
- * 
- * @return A pointer to the \c Ivar data structure that defines the type and 
- *  name of the instance variable specified by \e name.
+/**
+ * Creates an instance of this class, allocating memory using malloc.
+ */
+OBJC_PUBLIC
+id class_createInstance(Class cls, size_t extraBytes);
+
+/**
+ * Returns a pointer to the method metadata for the specified method in this
+ * class.  This is an opaque data type and must be accessed with the method_*()
+ * family of functions.
+ */
+OBJC_PUBLIC
+Method class_getClassMethod(Class aClass, SEL aSelector);
+
+/**
+ * Returns a pointer to the  metadata for the specified class variable in
+ * this class.  This is an opaque data type and must be accessed with the
+ * ivar_*() family of functions.
+ */
+OBJC_PUBLIC
+Ivar class_getClassVariable(Class cls, const char* name);
+
+/**
+ * Returns a pointer to the method metadata for the specified instance method
+ * in this class.  This is an opaque data type and must be accessed with the
+ * method_*() family of functions.
+ */
+OBJC_PUBLIC
+Method class_getInstanceMethod(Class aClass, SEL aSelector);
+
+/**
+ * Returns the size of an instance of the named class, in bytes.  All of the
+ * class's superclasses must be loaded before this call, or the result is
+ * undefined with the non-fragile ABI.
+ */
+OBJC_PUBLIC
+size_t class_getInstanceSize(Class cls);
+
+/**
+ * Look up the named instance variable in the class (and its superclasses)
+ * returning a pointer to the instance variable definition or a null
+ * pointer if no instance variable of that name was found.
+ */
+OBJC_PUBLIC
+Ivar class_getInstanceVariable(Class cls, const char* name);
+
+/**
+ * Sets the object value of a specified instance variable.
+ */
+OBJC_PUBLIC
+void object_setIvar(id object, Ivar ivar, id value);
+/**
+ * Sets a named instance variable to the value specified by *value.  Note that
+ * the instance variable must be a pointer-sized quantity.
+ */
+OBJC_PUBLIC
+Ivar object_setInstanceVariable(id obj, const char *name, void *value);
+
+/**
+ * Returns the value of the named instance variable.  This should not be used
+ * with instance variables that are not pointers.
+ */
+OBJC_PUBLIC
+id object_getIvar(id object, Ivar ivar);
+
+/**
+ * Returns a named instance variable via the final parameter.  Note that
+ * calling object_getIvar() on the value returned from this function is faster.
  *
- * @note Instance variables with known memory management (such as ARC strong and weak)
- *  use that memory management. Instance variables with unknown memory management 
- *  are assigned as if they were unsafe_unretained.
+ * Note that the instance variable must be a pointer-sized quantity.
  */
-OBJC_EXPORT Ivar _Nullable
-object_setInstanceVariable(id _Nullable obj, const char * _Nonnull name,
-                           void * _Nullable value)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0)
-    OBJC_ARC_UNAVAILABLE;
+OBJC_PUBLIC
+Ivar object_getInstanceVariable(id obj, const char *name, void **outValue);
 
-/** 
- * Changes the value of an instance variable of a class instance.
- * 
- * @param obj A pointer to an instance of a class. Pass the object containing
- *  the instance variable whose value you wish to modify.
- * @param name A C string. Pass the name of the instance variable whose value you wish to modify.
- * @param value The new value for the instance variable.
- * 
- * @return A pointer to the \c Ivar data structure that defines the type and 
- *  name of the instance variable specified by \e name.
- *
- * @note Instance variables with known memory management (such as ARC strong and weak)
- *  use that memory management. Instance variables with unknown memory management 
- *  are assigned as if they were strong.
+/**
+ * Returns a pointer to the function used to handle the specified message.  If
+ * the receiver does not have a method corresponding to this message then this
+ * function may return a runtime function that performs forwarding.
  */
-OBJC_EXPORT Ivar _Nullable
-object_setInstanceVariableWithStrongDefault(id _Nullable obj,
-                                            const char * _Nonnull name,
-                                            void * _Nullable value)
-    OBJC_AVAILABLE(10.12, 10.0, 10.0, 3.0, 2.0)
-    OBJC_ARC_UNAVAILABLE;
+OBJC_PUBLIC
+IMP class_getMethodImplementation(Class cls, SEL name);
 
-/** 
- * Obtains the value of an instance variable of a class instance.
- * 
- * @param obj A pointer to an instance of a class. Pass the object containing
- *  the instance variable whose value you wish to obtain.
- * @param name A C string. Pass the name of the instance variable whose value you wish to obtain.
- * @param outValue On return, contains a pointer to the value of the instance variable.
- * 
- * @return A pointer to the \c Ivar data structure that defines the type and name of
- *  the instance variable specified by \e name.
+/**
+ * Identical to class_getMethodImplementation().
  */
-OBJC_EXPORT Ivar _Nullable
-object_getInstanceVariable(id _Nullable obj, const char * _Nonnull name,
-                           void * _Nullable * _Nullable outValue)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0)
-    OBJC_ARC_UNAVAILABLE;
+OBJC_PUBLIC
+IMP class_getMethodImplementation_stret(Class cls, SEL name);
 
-
-/* Obtaining Class Definitions */
-
-/** 
- * Returns the class definition of a specified class.
- * 
- * @param name The name of the class to look up.
- * 
- * @return The Class object for the named class, or \c nil
- *  if the class is not registered with the Objective-C runtime.
- * 
- * @note \c objc_getClass is different from \c objc_lookUpClass in that if the class
- *  is not registered, \c objc_getClass calls the class handler callback and then checks
- *  a second time to see whether the class is registered. \c objc_lookUpClass does 
- *  not call the class handler callback.
- * 
- * @warning Earlier implementations of this function (prior to OS X v10.0)
- *  terminate the program if the class does not exist.
+/**
+ * Returns the name of the class.  This string is owned by the runtime and is
+ * valid for (at least) as long as the class remains loaded.
  */
-OBJC_EXPORT Class _Nullable
-objc_getClass(const char * _Nonnull name)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+const char * class_getName(Class cls);
 
-/** 
- * Returns the metaclass definition of a specified class.
- * 
- * @param name The name of the class to look up.
- * 
- * @return The \c Class object for the metaclass of the named class, or \c nil if the class
- *  is not registered with the Objective-C runtime.
- * 
- * @note If the definition for the named class is not registered, this function calls the class handler
- *  callback and then checks a second time to see if the class is registered. However, every class
- *  definition must have a valid metaclass definition, and so the metaclass definition is always returned,
- *  whether it’s valid or not.
+/**
+ * Retrieves metadata about the property with the specified name.
  */
-OBJC_EXPORT Class _Nullable
-objc_getMetaClass(const char * _Nonnull name)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+objc_property_t class_getProperty(Class cls, const char *name);
 
-/** 
- * Returns the class definition of a specified class.
- * 
- * @param name The name of the class to look up.
- * 
- * @return The Class object for the named class, or \c nil if the class
- *  is not registered with the Objective-C runtime.
- * 
- * @note \c objc_getClass is different from this function in that if the class is not
- *  registered, \c objc_getClass calls the class handler callback and then checks a second
- *  time to see whether the class is registered. This function does not call the class handler callback.
+/**
+ * Returns the superclass of the specified class.
  */
-OBJC_EXPORT Class _Nullable
-objc_lookUpClass(const char * _Nonnull name)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+Class class_getSuperclass(Class cls);
 
-/** 
- * Returns the class definition of a specified class.
- * 
- * @param name The name of the class to look up.
- * 
- * @return The Class object for the named class.
- * 
- * @note This function is the same as \c objc_getClass, but kills the process if the class is not found.
- * @note This function is used by ZeroLink, where failing to find a class would be a compile-time link error without ZeroLink.
+/**
+ * Returns the version of the class.  Currently, the class version is not used
+ * inside the runtime at all, however it may be used for the developer-mode ABI.
  */
-OBJC_EXPORT Class _Nonnull
-objc_getRequiredClass(const char * _Nonnull name)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+int class_getVersion(Class theClass);
 
-/** 
- * Obtains the list of registered class definitions.
- * 
- * @param buffer An array of \c Class values. On output, each \c Class value points to
- *  one class definition, up to either \e bufferCount or the total number of registered classes,
- *  whichever is less. You can pass \c NULL to obtain the total number of registered class
- *  definitions without actually retrieving any class definitions.
- * @param bufferCount An integer value. Pass the number of pointers for which you have allocated space
- *  in \e buffer. On return, this function fills in only this number of elements. If this number is less
- *  than the number of registered classes, this function returns an arbitrary subset of the registered classes.
- * 
- * @return An integer value indicating the total number of registered classes.
- * 
- * @note The Objective-C runtime library automatically registers all the classes defined in your source code.
- *  You can create class definitions at runtime and register them with the \c objc_addClass function.
- * 
- * @warning You cannot assume that class objects you get from this function are classes that inherit from \c NSObject,
- *  so you cannot safely call any methods on such classes without detecting that the method is implemented first.
+/**
+ * Sets the version for this class.
  */
-OBJC_EXPORT int
-objc_getClassList(Class _Nonnull * _Nullable buffer, int bufferCount)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+void class_setVersion(Class theClass, int version);
 
-/** 
- * Creates and returns a list of pointers to all registered class definitions.
- * 
- * @param outCount An integer pointer used to store the number of classes returned by
- *  this function in the list. It can be \c nil.
- * 
- * @return A nil terminated array of classes. It must be freed with \c free().
- * 
- * @see objc_getClassList
+OBJC_PUBLIC OBJC_GNUSTEP_RUNTIME_UNSUPPORTED("Weak instance variables")
+const char *class_getWeakIvarLayout(Class cls);
+
+/**
+ * Returns whether the class is a metaclass.  This can be used in conjunction
+ * with object_getClass() for differentiating between objects and classes.
  */
-OBJC_EXPORT Class _Nonnull * _Nullable
-objc_copyClassList(unsigned int * _Nullable outCount)
-    OBJC_AVAILABLE(10.7, 3.1, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+BOOL class_isMetaClass(Class cls);
 
-
-/* Working with Classes */
-
-/** 
- * Returns the name of a class.
- * 
- * @param cls A class object.
- * 
- * @return The name of the class, or the empty string if \e cls is \c Nil.
+/**
+ * Registers an alias for the class. Returns YES if the alias could be
+ * registered successfully.
  */
-OBJC_EXPORT const char * _Nonnull
-class_getName(Class _Nullable cls) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC OBJC_NONPORTABLE
+BOOL class_registerAlias_np(Class cls, const char *alias);
 
-/** 
- * Returns a Boolean value that indicates whether a class object is a metaclass.
- * 
- * @param cls A class object.
- * 
- * @return \c YES if \e cls is a metaclass, \c NO if \e cls is a non-meta class, 
- *  \c NO if \e cls is \c Nil.
+/**
+ * Replaces the named method with a new implementation.  Note: the GNUstep
+ * Objective-C runtime uses typed selectors, however the types of the selector
+ * will be ignored and a new selector registered with the specified types.
  */
-OBJC_EXPORT BOOL
-class_isMetaClass(Class _Nullable cls) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+IMP class_replaceMethod(Class cls, SEL name, IMP imp, const char *types);
 
-/** 
- * Returns the superclass of a class.
- * 
- * @param cls A class object.
- * 
- * @return The superclass of the class, or \c Nil if
- *  \e cls is a root class, or \c Nil if \e cls is \c Nil.
- *
- * @note You should usually use \c NSObject's \c superclass method instead of this function.
+/**
+ * Returns YES if instances of this class has a method that implements the
+ * specified message, NO otherwise.  If the class handles this message via one
+ * or more of the various forwarding mechanisms, then this will still return
+ * NO.
  */
-OBJC_EXPORT Class _Nullable
-class_getSuperclass(Class _Nullable cls) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+BOOL class_respondsToSelector(Class cls, SEL sel);
 
-/** 
- * Sets the superclass of a given class.
- * 
- * @param cls The class whose superclass you want to set.
- * @param newSuper The new superclass for cls.
- * 
- * @return The old superclass for cls.
- * 
- * @warning You should not use this function.
+/**
+ * Returns the instance variable layout of this class as an opaque list that
+ * can be applied to other classes.
  */
-OBJC_EXPORT Class _Nonnull
-class_setSuperclass(Class _Nonnull cls, Class _Nonnull newSuper) 
-    __OSX_DEPRECATED(10.5, 10.5, "not recommended") 
-    __IOS_DEPRECATED(2.0, 2.0, "not recommended") 
-    __TVOS_DEPRECATED(9.0, 9.0, "not recommended") 
-    __WATCHOS_DEPRECATED(1.0, 1.0, "not recommended")
-    ;
-
-/** 
- * Returns the version number of a class definition.
- * 
- * @param cls A pointer to a \c Class data structure. Pass
- *  the class definition for which you wish to obtain the version.
- * 
- * @return An integer indicating the version number of the class definition.
- *
- * @see class_setVersion
+OBJC_PUBLIC
+const char *class_getIvarLayout(Class cls);
+/**
+ * Sets the class's instance variable layout.  The layout argument must be a
+ * value returned by class_getIvarLayout().
  */
-OBJC_EXPORT int
-class_getVersion(Class _Nullable cls)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+void class_setIvarLayout(Class cls, const char *layout);
 
-/** 
- * Sets the version number of a class definition.
- * 
- * @param cls A pointer to an Class data structure. 
- *  Pass the class definition for which you wish to set the version.
- * @param version An integer. Pass the new version number of the class definition.
- *
- * @note You can use the version number of the class definition to provide versioning of the
- *  interface that your class represents to other classes. This is especially useful for object
- *  serialization (that is, archiving of the object in a flattened form), where it is important to
- *  recognize changes to the layout of the instance variables in different class-definition versions.
- * @note Classes derived from the Foundation framework \c NSObject class can set the class-definition
- *  version number using the \c setVersion: class method, which is implemented using the \c class_setVersion function.
+/**
+ * Sets the superclass of the specified class.  This function is deprecated,
+ * because modifying the superclass of a class at run time is a very complex
+ * operation and this function is almost always used incorrectly.
  */
-OBJC_EXPORT void
-class_setVersion(Class _Nullable cls, int version)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC __attribute__((deprecated))
+Class class_setSuperclass(Class cls, Class newSuper);
 
-/** 
- * Returns the size of instances of a class.
- * 
- * @param cls A class object.
- * 
- * @return The size in bytes of instances of the class \e cls, or \c 0 if \e cls is \c Nil.
- */
-OBJC_EXPORT size_t
-class_getInstanceSize(Class _Nullable cls) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC OBJC_GNUSTEP_RUNTIME_UNSUPPORTED("Weak instance variables")
+void class_setWeakIvarLayout(Class cls, const char *layout);
 
-/** 
- * Returns the \c Ivar for a specified instance variable of a given class.
- * 
- * @param cls The class whose instance variable you wish to obtain.
- * @param name The name of the instance variable definition to obtain.
- * 
- * @return A pointer to an \c Ivar data structure containing information about 
- *  the instance variable specified by \e name.
- */
-OBJC_EXPORT Ivar _Nullable
-class_getInstanceVariable(Class _Nullable cls, const char * _Nonnull name)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns the Ivar for a specified class variable of a given class.
- * 
- * @param cls The class definition whose class variable you wish to obtain.
- * @param name The name of the class variable definition to obtain.
- * 
- * @return A pointer to an \c Ivar data structure containing information about the class variable specified by \e name.
- */
-OBJC_EXPORT Ivar _Nullable
-class_getClassVariable(Class _Nullable cls, const char * _Nonnull name) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Describes the instance variables declared by a class.
- * 
- * @param cls The class to inspect.
- * @param outCount On return, contains the length of the returned array. 
- *  If outCount is NULL, the length is not returned.
- * 
- * @return An array of pointers of type Ivar describing the instance variables declared by the class. 
- *  Any instance variables declared by superclasses are not included. The array contains *outCount 
- *  pointers followed by a NULL terminator. You must free the array with free().
- * 
- *  If the class declares no instance variables, or cls is Nil, NULL is returned and *outCount is 0.
- */
-OBJC_EXPORT Ivar _Nonnull * _Nullable
-class_copyIvarList(Class _Nullable cls, unsigned int * _Nullable outCount) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns a specified instance method for a given class.
- * 
- * @param cls The class you want to inspect.
- * @param name The selector of the method you want to retrieve.
- * 
- * @return The method that corresponds to the implementation of the selector specified by 
- *  \e name for the class specified by \e cls, or \c NULL if the specified class or its 
- *  superclasses do not contain an instance method with the specified selector.
- *
- * @note This function searches superclasses for implementations, whereas \c class_copyMethodList does not.
- */
-OBJC_EXPORT Method _Nullable
-class_getInstanceMethod(Class _Nullable cls, SEL _Nonnull name)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns a pointer to the data structure describing a given class method for a given class.
- * 
- * @param cls A pointer to a class definition. Pass the class that contains the method you want to retrieve.
- * @param name A pointer of type \c SEL. Pass the selector of the method you want to retrieve.
- * 
- * @return A pointer to the \c Method data structure that corresponds to the implementation of the 
- *  selector specified by aSelector for the class specified by aClass, or NULL if the specified 
- *  class or its superclasses do not contain an instance method with the specified selector.
- *
- * @note Note that this function searches superclasses for implementations, 
- *  whereas \c class_copyMethodList does not.
- */
-OBJC_EXPORT Method _Nullable
-class_getClassMethod(Class _Nullable cls, SEL _Nonnull name)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns the function pointer that would be called if a 
- * particular message were sent to an instance of a class.
- * 
- * @param cls The class you want to inspect.
- * @param name A selector.
- * 
- * @return The function pointer that would be called if \c [object name] were called
- *  with an instance of the class, or \c NULL if \e cls is \c Nil.
- *
- * @note \c class_getMethodImplementation may be faster than \c method_getImplementation(class_getInstanceMethod(cls, name)).
- * @note The function pointer returned may be a function internal to the runtime instead of
- *  an actual method implementation. For example, if instances of the class do not respond to
- *  the selector, the function pointer returned will be part of the runtime's message forwarding machinery.
- */
-OBJC_EXPORT IMP _Nullable
-class_getMethodImplementation(Class _Nullable cls, SEL _Nonnull name) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns the function pointer that would be called if a particular 
- * message were sent to an instance of a class.
- * 
- * @param cls The class you want to inspect.
- * @param name A selector.
- * 
- * @return The function pointer that would be called if \c [object name] were called
- *  with an instance of the class, or \c NULL if \e cls is \c Nil.
- */
-OBJC_EXPORT IMP _Nullable
-class_getMethodImplementation_stret(Class _Nullable cls, SEL _Nonnull name) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0)
-    OBJC_ARM64_UNAVAILABLE;
-
-/** 
- * Returns a Boolean value that indicates whether instances of a class respond to a particular selector.
- * 
- * @param cls The class you want to inspect.
- * @param sel A selector.
- * 
- * @return \c YES if instances of the class respond to the selector, otherwise \c NO.
- * 
- * @note You should usually use \c NSObject's \c respondsToSelector: or \c instancesRespondToSelector: 
- *  methods instead of this function.
- */
-OBJC_EXPORT BOOL
-class_respondsToSelector(Class _Nullable cls, SEL _Nonnull sel) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Describes the instance methods implemented by a class.
- * 
- * @param cls The class you want to inspect.
- * @param outCount On return, contains the length of the returned array. 
- *  If outCount is NULL, the length is not returned.
- * 
- * @return An array of pointers of type Method describing the instance methods 
- *  implemented by the class—any instance methods implemented by superclasses are not included. 
- *  The array contains *outCount pointers followed by a NULL terminator. You must free the array with free().
- * 
- *  If cls implements no instance methods, or cls is Nil, returns NULL and *outCount is 0.
- * 
- * @note To get the class methods of a class, use \c class_copyMethodList(object_getClass(cls), &count).
- * @note To get the implementations of methods that may be implemented by superclasses, 
- *  use \c class_getInstanceMethod or \c class_getClassMethod.
- */
-OBJC_EXPORT Method _Nonnull * _Nullable
-class_copyMethodList(Class _Nullable cls, unsigned int * _Nullable outCount) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns a Boolean value that indicates whether a class conforms to a given protocol.
- * 
- * @param cls The class you want to inspect.
- * @param protocol A protocol.
- *
- * @return YES if cls conforms to protocol, otherwise NO.
- *
- * @note You should usually use NSObject's conformsToProtocol: method instead of this function.
- */
-OBJC_EXPORT BOOL
-class_conformsToProtocol(Class _Nullable cls, Protocol * _Nullable protocol) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Describes the protocols adopted by a class.
- * 
- * @param cls The class you want to inspect.
- * @param outCount On return, contains the length of the returned array. 
- *  If outCount is NULL, the length is not returned.
- * 
- * @return An array of pointers of type Protocol* describing the protocols adopted 
- *  by the class. Any protocols adopted by superclasses or other protocols are not included. 
- *  The array contains *outCount pointers followed by a NULL terminator. You must free the array with free().
- * 
- *  If cls adopts no protocols, or cls is Nil, returns NULL and *outCount is 0.
- */
-OBJC_EXPORT Protocol * __unsafe_unretained _Nonnull * _Nullable 
-class_copyProtocolList(Class _Nullable cls, unsigned int * _Nullable outCount)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns a property with a given name of a given class.
- * 
- * @param cls The class you want to inspect.
- * @param name The name of the property you want to inspect.
- * 
- * @return A pointer of type \c objc_property_t describing the property, or
- *  \c NULL if the class does not declare a property with that name, 
- *  or \c NULL if \e cls is \c Nil.
- */
-OBJC_EXPORT objc_property_t _Nullable
-class_getProperty(Class _Nullable cls, const char * _Nonnull name)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Describes the properties declared by a class.
- * 
- * @param cls The class you want to inspect.
- * @param outCount On return, contains the length of the returned array. 
- *  If \e outCount is \c NULL, the length is not returned.        
- * 
- * @return An array of pointers of type \c objc_property_t describing the properties 
- *  declared by the class. Any properties declared by superclasses are not included. 
- *  The array contains \c *outCount pointers followed by a \c NULL terminator. You must free the array with \c free().
- * 
- *  If \e cls declares no properties, or \e cls is \c Nil, returns \c NULL and \c *outCount is \c 0.
- */
-OBJC_EXPORT objc_property_t _Nonnull * _Nullable
-class_copyPropertyList(Class _Nullable cls, unsigned int * _Nullable outCount)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns a description of the \c Ivar layout for a given class.
- * 
- * @param cls The class to inspect.
- * 
- * @return A description of the \c Ivar layout for \e cls.
- */
-OBJC_EXPORT const uint8_t * _Nullable
-class_getIvarLayout(Class _Nullable cls)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns a description of the layout of weak Ivars for a given class.
- * 
- * @param cls The class to inspect.
- * 
- * @return A description of the layout of the weak \c Ivars for \e cls.
- */
-OBJC_EXPORT const uint8_t * _Nullable
-class_getWeakIvarLayout(Class _Nullable cls)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Adds a new method to a class with a given name and implementation.
- * 
- * @param cls The class to which to add a method.
- * @param name A selector that specifies the name of the method being added.
- * @param imp A function which is the implementation of the new method. The function must take at least two arguments—self and _cmd.
- * @param types An array of characters that describe the types of the arguments to the method. 
- * 
- * @return YES if the method was added successfully, otherwise NO 
- *  (for example, the class already contains a method implementation with that name).
- *
- * @note class_addMethod will add an override of a superclass's implementation, 
- *  but will not replace an existing implementation in this class. 
- *  To change an existing implementation, use method_setImplementation.
- */
-OBJC_EXPORT BOOL
-class_addMethod(Class _Nullable cls, SEL _Nonnull name, IMP _Nonnull imp, 
-                const char * _Nullable types) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Replaces the implementation of a method for a given class.
- * 
- * @param cls The class you want to modify.
- * @param name A selector that identifies the method whose implementation you want to replace.
- * @param imp The new implementation for the method identified by name for the class identified by cls.
- * @param types An array of characters that describe the types of the arguments to the method. 
- *  Since the function must take at least two arguments—self and _cmd, the second and third characters
- *  must be “@:” (the first character is the return type).
- * 
- * @return The previous implementation of the method identified by \e name for the class identified by \e cls.
- * 
- * @note This function behaves in two different ways:
- *  - If the method identified by \e name does not yet exist, it is added as if \c class_addMethod were called. 
- *    The type encoding specified by \e types is used as given.
- *  - If the method identified by \e name does exist, its \c IMP is replaced as if \c method_setImplementation were called.
- *    The type encoding specified by \e types is ignored.
- */
-OBJC_EXPORT IMP _Nullable
-class_replaceMethod(Class _Nullable cls, SEL _Nonnull name, IMP _Nonnull imp, 
-                    const char * _Nullable types) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Adds a new instance variable to a class.
- * 
- * @return YES if the instance variable was added successfully, otherwise NO 
- *         (for example, the class already contains an instance variable with that name).
- *
- * @note This function may only be called after objc_allocateClassPair and before objc_registerClassPair. 
- *       Adding an instance variable to an existing class is not supported.
- * @note The class must not be a metaclass. Adding an instance variable to a metaclass is not supported.
- * @note The instance variable's minimum alignment in bytes is 1<<align. The minimum alignment of an instance 
- *       variable depends on the ivar's type and the machine architecture. 
- *       For variables of any pointer type, pass log2(sizeof(pointer_type)).
- */
-OBJC_EXPORT BOOL
-class_addIvar(Class _Nullable cls, const char * _Nonnull name, size_t size, 
-              uint8_t alignment, const char * _Nullable types) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Adds a protocol to a class.
- * 
- * @param cls The class to modify.
- * @param protocol The protocol to add to \e cls.
- * 
- * @return \c YES if the method was added successfully, otherwise \c NO 
- *  (for example, the class already conforms to that protocol).
- */
-OBJC_EXPORT BOOL
-class_addProtocol(Class _Nullable cls, Protocol * _Nonnull protocol) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Adds a property to a class.
- * 
- * @param cls The class to modify.
- * @param name The name of the property.
- * @param attributes An array of property attributes.
- * @param attributeCount The number of attributes in \e attributes.
- * 
- * @return \c YES if the property was added successfully, otherwise \c NO
- *  (for example, the class already has that property).
- */
-OBJC_EXPORT BOOL
-class_addProperty(Class _Nullable cls, const char * _Nonnull name,
-                  const objc_property_attribute_t * _Nullable attributes,
-                  unsigned int attributeCount)
-    OBJC_AVAILABLE(10.7, 4.3, 9.0, 1.0, 2.0);
-
-/** 
- * Replace a property of a class. 
- * 
- * @param cls The class to modify.
- * @param name The name of the property.
- * @param attributes An array of property attributes.
- * @param attributeCount The number of attributes in \e attributes. 
- */
-OBJC_EXPORT void
-class_replaceProperty(Class _Nullable cls, const char * _Nonnull name,
-                      const objc_property_attribute_t * _Nullable attributes,
-                      unsigned int attributeCount)
-    OBJC_AVAILABLE(10.7, 4.3, 9.0, 1.0, 2.0);
-
-/** 
- * Sets the Ivar layout for a given class.
- * 
- * @param cls The class to modify.
- * @param layout The layout of the \c Ivars for \e cls.
- */
-OBJC_EXPORT void
-class_setIvarLayout(Class _Nullable cls, const uint8_t * _Nullable layout)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Sets the layout for weak Ivars for a given class.
- * 
- * @param cls The class to modify.
- * @param layout The layout of the weak Ivars for \e cls.
- */
-OBJC_EXPORT void
-class_setWeakIvarLayout(Class _Nullable cls, const uint8_t * _Nullable layout)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Used by CoreFoundation's toll-free bridging.
- * Return the id of the named class.
- * 
- * @return The id of the named class, or an uninitialized class
- *  structure that will be used for the class when and if it does 
- *  get loaded.
- * 
- * @warning Do not call this function yourself.
- */
-OBJC_EXPORT Class _Nonnull
-objc_getFutureClass(const char * _Nonnull name) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0)
-    OBJC_ARC_UNAVAILABLE;
-
-
-/* Instantiating Classes */
-
-/** 
- * Creates an instance of a class, allocating memory for the class in the 
- * default malloc memory zone.
- * 
- * @param cls The class that you wish to allocate an instance of.
- * @param extraBytes An integer indicating the number of extra bytes to allocate. 
- *  The additional bytes can be used to store additional instance variables beyond 
- *  those defined in the class definition.
- * 
- * @return An instance of the class \e cls.
- */
-OBJC_EXPORT id _Nullable
-class_createInstance(Class _Nullable cls, size_t extraBytes)
-    OBJC_RETURNS_RETAINED
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Creates an instance of a class at the specific location provided.
- * 
- * @param cls The class that you wish to allocate an instance of.
- * @param bytes The location at which to allocate an instance of \e cls.
- *  Must point to at least \c class_getInstanceSize(cls) bytes of well-aligned,
- *  zero-filled memory.
- *
- * @return \e bytes on success, \c nil otherwise. (For example, \e cls or \e bytes
- *  might be \c nil)
- *
- * @see class_createInstance
- */
-OBJC_EXPORT id _Nullable
-objc_constructInstance(Class _Nullable cls, void * _Nullable bytes) 
-    OBJC_AVAILABLE(10.6, 3.0, 9.0, 1.0, 2.0)
-    OBJC_ARC_UNAVAILABLE;
-
-/** 
- * Destroys an instance of a class without freeing memory and removes any
- * associated references this instance might have had.
- * 
- * @param obj The class instance to destroy.
- * 
- * @return \e obj. Does nothing if \e obj is nil.
- * 
- * @note CF and other clients do call this under GC.
- */
-OBJC_EXPORT void * _Nullable objc_destructInstance(id _Nullable obj) 
-    OBJC_AVAILABLE(10.6, 3.0, 9.0, 1.0, 2.0)
-    OBJC_ARC_UNAVAILABLE;
-
-
-/* Adding Classes */
-
-/** 
- * Creates a new class and metaclass.
- * 
- * @param superclass The class to use as the new class's superclass, or \c Nil to create a new root class.
- * @param name The string to use as the new class's name. The string will be copied.
- * @param extraBytes The number of bytes to allocate for indexed ivars at the end of 
- *  the class and metaclass objects. This should usually be \c 0.
- * 
- * @return The new class, or Nil if the class could not be created (for example, the desired name is already in use).
- * 
- * @note You can get a pointer to the new metaclass by calling \c object_getClass(newClass).
- * @note To create a new class, start by calling \c objc_allocateClassPair. 
- *  Then set the class's attributes with functions like \c class_addMethod and \c class_addIvar.
- *  When you are done building the class, call \c objc_registerClassPair. The new class is now ready for use.
- * @note Instance methods and instance variables should be added to the class itself. 
- *  Class methods should be added to the metaclass.
- */
-OBJC_EXPORT Class _Nullable
-objc_allocateClassPair(Class _Nullable superclass, const char * _Nonnull name, 
-                       size_t extraBytes) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Registers a class that was allocated using \c objc_allocateClassPair.
- * 
- * @param cls The class you want to register.
- */
-OBJC_EXPORT void
-objc_registerClassPair(Class _Nonnull cls) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Used by Foundation's Key-Value Observing.
- * 
- * @warning Do not call this function yourself.
- */
-OBJC_EXPORT Class _Nonnull
-objc_duplicateClass(Class _Nonnull original, const char * _Nonnull name,
-                    size_t extraBytes)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Destroy a class and its associated metaclass. 
- * 
- * @param cls The class to be destroyed. It must have been allocated with 
- *  \c objc_allocateClassPair
- * 
- * @warning Do not call if instances of this class or a subclass exist.
- */
-OBJC_EXPORT void
-objc_disposeClassPair(Class _Nonnull cls) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-
-/* Working with Methods */
-
-/** 
- * Returns the name of a method.
- * 
- * @param m The method to inspect.
- * 
- * @return A pointer of type SEL.
- * 
- * @note To get the method name as a C string, call \c sel_getName(method_getName(method)).
- */
-OBJC_EXPORT SEL _Nonnull
-method_getName(Method _Nonnull m) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns the implementation of a method.
- * 
- * @param m The method to inspect.
- * 
- * @return A function pointer of type IMP.
- */
-OBJC_EXPORT IMP _Nonnull
-method_getImplementation(Method _Nonnull m) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns a string describing a method's parameter and return types.
- * 
- * @param m The method to inspect.
- * 
- * @return A C string. The string may be \c NULL.
- */
-OBJC_EXPORT const char * _Nullable
-method_getTypeEncoding(Method _Nonnull m) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns the number of arguments accepted by a method.
- * 
- * @param m A pointer to a \c Method data structure. Pass the method in question.
- * 
- * @return An integer containing the number of arguments accepted by the given method.
- */
-OBJC_EXPORT unsigned int
-method_getNumberOfArguments(Method _Nonnull m)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns a string describing a method's return type.
- * 
- * @param m The method to inspect.
- * 
- * @return A C string describing the return type. You must free the string with \c free().
- */
-OBJC_EXPORT char * _Nonnull
-method_copyReturnType(Method _Nonnull m) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns a string describing a single parameter type of a method.
- * 
- * @param m The method to inspect.
- * @param index The index of the parameter to inspect.
- * 
- * @return A C string describing the type of the parameter at index \e index, or \c NULL
- *  if method has no parameter index \e index. You must free the string with \c free().
- */
-OBJC_EXPORT char * _Nullable
-method_copyArgumentType(Method _Nonnull m, unsigned int index) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns by reference a string describing a method's return type.
- * 
- * @param m The method you want to inquire about. 
- * @param dst The reference string to store the description.
- * @param dst_len The maximum number of characters that can be stored in \e dst.
- *
- * @note The method's return type string is copied to \e dst.
- *  \e dst is filled as if \c strncpy(dst, parameter_type, dst_len) were called.
- */
-OBJC_EXPORT void
-method_getReturnType(Method _Nonnull m, char * _Nonnull dst, size_t dst_len) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns by reference a string describing a single parameter type of a method.
- * 
- * @param m The method you want to inquire about. 
- * @param index The index of the parameter you want to inquire about.
- * @param dst The reference string to store the description.
- * @param dst_len The maximum number of characters that can be stored in \e dst.
- * 
- * @note The parameter type string is copied to \e dst. \e dst is filled as if \c strncpy(dst, parameter_type, dst_len) 
- *  were called. If the method contains no parameter with that index, \e dst is filled as
- *  if \c strncpy(dst, "", dst_len) were called.
- */
-OBJC_EXPORT void
-method_getArgumentType(Method _Nonnull m, unsigned int index, 
-                       char * _Nullable dst, size_t dst_len) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-OBJC_EXPORT struct objc_method_description * _Nonnull
-method_getDescription(Method _Nonnull m) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Sets the implementation of a method.
- * 
- * @param m The method for which to set an implementation.
- * @param imp The implemention to set to this method.
- * 
- * @return The previous implementation of the method.
- */
-OBJC_EXPORT IMP _Nonnull
-method_setImplementation(Method _Nonnull m, IMP _Nonnull imp) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Exchanges the implementations of two methods.
- * 
- * @param m1 Method to exchange with second method.
- * @param m2 Method to exchange with first method.
- * 
- * @note This is an atomic version of the following:
- *  \code 
- *  IMP imp1 = method_getImplementation(m1);
- *  IMP imp2 = method_getImplementation(m2);
- *  method_setImplementation(m1, imp2);
- *  method_setImplementation(m2, imp1);
- *  \endcode
- */
-OBJC_EXPORT void
-method_exchangeImplementations(Method _Nonnull m1, Method _Nonnull m2) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-
-/* Working with Instance Variables */
-
-/** 
+/**
  * Returns the name of an instance variable.
- * 
- * @param v The instance variable you want to enquire about.
- * 
- * @return A C string containing the instance variable's name.
  */
-OBJC_EXPORT const char * _Nullable
-ivar_getName(Ivar _Nonnull v) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+const char* ivar_getName(Ivar ivar);
 
-/** 
- * Returns the type string of an instance variable.
- * 
- * @param v The instance variable you want to enquire about.
- * 
- * @return A C string containing the instance variable's type encoding.
+/**
+ * Returns the offset of an instance variable.  This value can be added to the
+ * object pointer to get the address of the instance variable.
+ */
+OBJC_PUBLIC
+ptrdiff_t ivar_getOffset(Ivar ivar);
+
+/**
+ * Returns the Objective-C type encoding of the instance variable.
+ */
+OBJC_PUBLIC
+const char* ivar_getTypeEncoding(Ivar ivar);
+
+/**
+ * Copies the type encoding of an argument of this method.  The caller is
+ * responsible for freeing the returned C string.  Arguments 0 and 1 of any
+ * Objective-C method will be the self and _cmd parameters, so the returned
+ * value will be "@" and ":" respectively.
+ */
+OBJC_PUBLIC
+char* method_copyArgumentType(Method method, unsigned int index);
+
+/**
+ * Copies the type encoding of an argument of this method.  The caller is
+ * responsible for freeing the returned C string.
+ */
+OBJC_PUBLIC
+char* method_copyReturnType(Method method);
+
+/**
+ * Exchanges the implementations of the two methods.  Note: this call is very
+ * expensive on the GNUstep runtime and its use is discouraged.  It is
+ * recommended that users call class_replaceMethod() instead.
+ */
+OBJC_PUBLIC
+void method_exchangeImplementations(Method m1, Method m2);
+
+/**
+ * Copies the Objective-C type encoding of a specified method parameter into a
+ * buffer provided by the caller.  This method does not provide any means for
+ * the caller to easily detect truncation, and will only NULL-terminate the
+ * output string if there is enough space for the argument type and the NULL
+ * terminator.  Its use is therefore discouraged.
+ */
+OBJC_PUBLIC
+void method_getArgumentType(Method method, unsigned int index, char *dst, size_t dst_len);
+
+/**
+ * Returns a pointer to the function used to implement this method.
+ */
+OBJC_PUBLIC
+IMP method_getImplementation(Method method);
+
+/**
+ * Returns the selector used to identify this method.  Note that, unlike the
+ * Apple runtimes, the GNUstep runtime uses typed selectors, so the return
+ * value for this also identifies the type of the method, not just its name,
+ * although calling method_getTypeEncoding() is faster if you just require the
+ * types.
+ */
+OBJC_PUBLIC
+SEL method_getName(Method method);
+
+/**
+ * Returns the number of arguments (including self and _cmd) that this method
+ * expects.
+ */
+OBJC_PUBLIC
+unsigned method_getNumberOfArguments(Method method);
+
+/**
+ * Copies the Objective-C type encoding of a method's return value into a
+ * buffer provided by the caller.  This method does not provide any means for
+ * the caller to easily detect truncation, and will only NULL-terminate the
+ * output string if there is enough space for the argument type and the NULL
+ * terminator.  Its use is therefore discouraged.
+ */
+OBJC_PUBLIC
+void method_getReturnType(Method method, char *dst, size_t dst_len);
+
+/**
+ * Returns the type encoding for the method.  This string is owned by the
+ * runtime and will persist for (at least) as long as the class owning the
+ * method is loaded.
+ */
+OBJC_PUBLIC
+const char * method_getTypeEncoding(Method method);
+
+/**
+ * Sets the function used to implement this method.  This function is very
+ * expensive with the GNUstep runtime and its use is discouraged.  It is
+ * recommended that you call class_replaceMethod() instead.
+ */
+OBJC_PUBLIC
+IMP method_setImplementation(Method method, IMP imp);
+
+/**
+ * Allocates a new class and metaclass inheriting from the specified class,
+ * with some space after the class for storing extra data.  This space can be
+ * used for class variables by adding instance variables to the returned
+ * metaclass.
+ */
+OBJC_PUBLIC
+Class objc_allocateClassPair(Class superclass, const char *name, size_t extraBytes);
+
+/**
+ * Frees a class and metaclass allocated with objc_allocateClassPair().  Any
+ * attempts to send messages to instances of this class or its subclasses
+ * result in undefined behaviour.
+ */
+OBJC_PUBLIC
+void objc_disposeClassPair(Class cls);
+
+/**
+ * Returns the class with the specified name, if one has been registered with
+ * the runtime, or nil if one does not exist.  If no class of this name is
+ * loaded, it calls the _objc_lookup_class() callback to allow an external
+ * library to load the module providing this class.
+ */
+OBJC_PUBLIC
+id objc_getClass(const char *name);
+
+/**
+ * Copies all of the classes currently registered with the runtime into the
+ * buffer specified as the first argument.  If the buffer is NULL or its length
+ * is 0, it returns the total number of classes registered with the runtime.
+ * Otherwise, it copies classes and returns the number copied.
+ */
+OBJC_PUBLIC
+int objc_getClassList(Class *buffer, int bufferLen);
+/**
+ * Returns a copy of the list of all classes in the system.  The caller is
+ * responsible for freeing this list.  The number of classes is returned in the
+ * parameter.
+ */
+OBJC_PUBLIC
+Class *objc_copyClassList(unsigned int *outCount);
+
+/**
+ * Returns the metaclass with the specified name.  This is equivalent to
+ * calling object_getClass() on the result of objc_getClass().
+ */
+OBJC_PUBLIC
+id objc_getMetaClass(const char *name);
+
+/**
+ * Returns the class with the specified name, aborting if none is found.  This
+ * function should generally only be called early on in a program, to ensure
+ * that all required libraries are loaded.
+ */
+OBJC_PUBLIC
+id objc_getRequiredClass(const char *name);
+
+/**
+ * Looks up the class with the specified name, but does not invoke any
+ * external lazy loading mechanisms.
+ */
+OBJC_PUBLIC
+id objc_lookUpClass(const char *name);
+
+/**
+ * Returns the protocol with the specified name.
+ */
+OBJC_PUBLIC
+Protocol *objc_getProtocol(const char *name);
+/**
+ * Allocates a new protocol.  This returns NULL if a protocol with the same
+ * name already exists in the system.
  *
- * @note For possible values, see Objective-C Runtime Programming Guide > Type Encodings.
+ * Protocols are immutable after they have been registered, so may only be
+ * modified between calling this function and calling objc_registerProtocol().
  */
-OBJC_EXPORT const char * _Nullable
-ivar_getTypeEncoding(Ivar _Nonnull v) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns the offset of an instance variable.
- * 
- * @param v The instance variable you want to enquire about.
- * 
- * @return The offset of \e v.
- * 
- * @note For instance variables of type \c id or other object types, call \c object_getIvar
- *  and \c object_setIvar instead of using this offset to access the instance variable data directly.
+OBJC_PUBLIC
+Protocol *objc_allocateProtocol(const char *name);
+/**
+ * Registers a protocol with the runtime.  After this point, the protocol may
+ * not be modified.
  */
-OBJC_EXPORT ptrdiff_t
-ivar_getOffset(Ivar _Nonnull v) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-
-/* Working with Properties */
-
-/** 
- * Returns the name of a property.
- * 
- * @param property The property you want to inquire about.
- * 
- * @return A C string containing the property's name.
+OBJC_PUBLIC
+void objc_registerProtocol(Protocol *proto);
+/**
+ * Adds a method to the protocol.
  */
-OBJC_EXPORT const char * _Nonnull
-property_getName(objc_property_t _Nonnull property) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns the attribute string of a property.
- * 
- * @param property A property.
- *
- * @return A C string containing the property's attributes.
- * 
- * @note The format of the attribute string is described in Declared Properties in Objective-C Runtime Programming Guide.
- */
-OBJC_EXPORT const char * _Nullable
-property_getAttributes(objc_property_t _Nonnull property) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns an array of property attributes for a property. 
- * 
- * @param property The property whose attributes you want copied.
- * @param outCount The number of attributes returned in the array.
- * 
- * @return An array of property attributes; must be free'd() by the caller. 
- */
-OBJC_EXPORT objc_property_attribute_t * _Nullable
-property_copyAttributeList(objc_property_t _Nonnull property,
-                           unsigned int * _Nullable outCount)
-    OBJC_AVAILABLE(10.7, 4.3, 9.0, 1.0, 2.0);
-
-/** 
- * Returns the value of a property attribute given the attribute name.
- * 
- * @param property The property whose attribute value you are interested in.
- * @param attributeName C string representing the attribute name.
- *
- * @return The value string of the attribute \e attributeName if it exists in
- *  \e property, \c nil otherwise. 
- */
-OBJC_EXPORT char * _Nullable
-property_copyAttributeValue(objc_property_t _Nonnull property,
-                            const char * _Nonnull attributeName)
-    OBJC_AVAILABLE(10.7, 4.3, 9.0, 1.0, 2.0);
-
-
-/* Working with Protocols */
-
-/** 
- * Returns a specified protocol.
- * 
- * @param name The name of a protocol.
- * 
- * @return The protocol named \e name, or \c NULL if no protocol named \e name could be found.
- * 
- * @note This function acquires the runtime lock.
- */
-OBJC_EXPORT Protocol * _Nullable
-objc_getProtocol(const char * _Nonnull name)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns an array of all the protocols known to the runtime.
- * 
- * @param outCount Upon return, contains the number of protocols in the returned array.
- * 
- * @return A C array of all the protocols known to the runtime. The array contains \c *outCount
- *  pointers followed by a \c NULL terminator. You must free the list with \c free().
- * 
- * @note This function acquires the runtime lock.
- */
-OBJC_EXPORT Protocol * __unsafe_unretained _Nonnull * _Nullable
-objc_copyProtocolList(unsigned int * _Nullable outCount)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns a Boolean value that indicates whether one protocol conforms to another protocol.
- * 
- * @param proto A protocol.
- * @param other A protocol.
- * 
- * @return \c YES if \e proto conforms to \e other, otherwise \c NO.
- * 
- * @note One protocol can incorporate other protocols using the same syntax 
- *  that classes use to adopt a protocol:
- *  \code
- *  @protocol ProtocolName < protocol list >
- *  \endcode
- *  All the protocols listed between angle brackets are considered part of the ProtocolName protocol.
- */
-OBJC_EXPORT BOOL
-protocol_conformsToProtocol(Protocol * _Nullable proto,
-                            Protocol * _Nullable other)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns a Boolean value that indicates whether two protocols are equal.
- * 
- * @param proto A protocol.
- * @param other A protocol.
- * 
- * @return \c YES if \e proto is the same as \e other, otherwise \c NO.
- */
-OBJC_EXPORT BOOL
-protocol_isEqual(Protocol * _Nullable proto, Protocol * _Nullable other)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns the name of a protocol.
- * 
- * @param proto A protocol.
- * 
- * @return The name of the protocol \e p as a C string.
- */
-OBJC_EXPORT const char * _Nonnull
-protocol_getName(Protocol * _Nonnull proto)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns a method description structure for a specified method of a given protocol.
- * 
- * @param proto A protocol.
- * @param aSel A selector.
- * @param isRequiredMethod A Boolean value that indicates whether aSel is a required method.
- * @param isInstanceMethod A Boolean value that indicates whether aSel is an instance method.
- * 
- * @return An \c objc_method_description structure that describes the method specified by \e aSel,
- *  \e isRequiredMethod, and \e isInstanceMethod for the protocol \e p.
- *  If the protocol does not contain the specified method, returns an \c objc_method_description structure
- *  with the value \c {NULL, \c NULL}.
- * 
- * @note This function recursively searches any protocols that this protocol conforms to.
- */
-OBJC_EXPORT struct objc_method_description
-protocol_getMethodDescription(Protocol * _Nonnull proto, SEL _Nonnull aSel,
-                              BOOL isRequiredMethod, BOOL isInstanceMethod)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns an array of method descriptions of methods meeting a given specification for a given protocol.
- * 
- * @param proto A protocol.
- * @param isRequiredMethod A Boolean value that indicates whether returned methods should
- *  be required methods (pass YES to specify required methods).
- * @param isInstanceMethod A Boolean value that indicates whether returned methods should
- *  be instance methods (pass YES to specify instance methods).
- * @param outCount Upon return, contains the number of method description structures in the returned array.
- * 
- * @return A C array of \c objc_method_description structures containing the names and types of \e p's methods 
- *  specified by \e isRequiredMethod and \e isInstanceMethod. The array contains \c *outCount pointers followed
- *  by a \c NULL terminator. You must free the list with \c free().
- *  If the protocol declares no methods that meet the specification, \c NULL is returned and \c *outCount is 0.
- * 
- * @note Methods in other protocols adopted by this protocol are not included.
- */
-OBJC_EXPORT struct objc_method_description * _Nullable
-protocol_copyMethodDescriptionList(Protocol * _Nonnull proto,
+OBJC_PUBLIC
+void protocol_addMethodDescription(Protocol *aProtocol,
+                                   SEL name,
+                                   const char *types,
                                    BOOL isRequiredMethod,
-                                   BOOL isInstanceMethod,
-                                   unsigned int * _Nullable outCount)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns the specified property of a given protocol.
- * 
- * @param proto A protocol.
- * @param name The name of a property.
- * @param isRequiredProperty \c YES searches for a required property, \c NO searches for an optional property.
- * @param isInstanceProperty \c YES searches for an instance property, \c NO searches for a class property.
- * 
- * @return The property specified by \e name, \e isRequiredProperty, and \e isInstanceProperty for \e proto,
- *  or \c NULL if none of \e proto's properties meets the specification.
+                                   BOOL isInstanceMethod);
+/**
+ * Adds a protocol to the protocol.
  */
-OBJC_EXPORT objc_property_t _Nullable
-protocol_getProperty(Protocol * _Nonnull proto,
-                     const char * _Nonnull name,
-                     BOOL isRequiredProperty, BOOL isInstanceProperty)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns an array of the required instance properties declared by a protocol.
- * 
- * @note Identical to 
- * \code
- * protocol_copyPropertyList2(proto, outCount, YES, YES);
- * \endcode
+OBJC_PUBLIC
+void protocol_addProtocol(Protocol *aProtocol, Protocol *addition);
+/**
+ * Adds a property to the protocol.
  */
-OBJC_EXPORT objc_property_t _Nonnull * _Nullable
-protocol_copyPropertyList(Protocol * _Nonnull proto,
-                          unsigned int * _Nullable outCount)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+OBJC_PUBLIC
+void protocol_addProperty(Protocol *aProtocol,
+                          const char *name,
+                          const objc_property_attribute_t *attributes,
+                          unsigned int attributeCount,
+                          BOOL isRequiredProperty,
+                          BOOL isInstanceProperty);
 
-/** 
- * Returns an array of properties declared by a protocol.
- * 
- * @param proto A protocol.
- * @param outCount Upon return, contains the number of elements in the returned array.
- * @param isRequiredProperty \c YES returns required properties, \c NO returns optional properties.
- * @param isInstanceProperty \c YES returns instance properties, \c NO returns class properties.
- * 
- * @return A C array of pointers of type \c objc_property_t describing the properties declared by \e proto.
- *  Any properties declared by other protocols adopted by this protocol are not included. The array contains
- *  \c *outCount pointers followed by a \c NULL terminator. You must free the array with \c free().
- *  If the protocol declares no matching properties, \c NULL is returned and \c *outCount is \c 0.
- */
-OBJC_EXPORT objc_property_t _Nonnull * _Nullable
-protocol_copyPropertyList2(Protocol * _Nonnull proto,
-                           unsigned int * _Nullable outCount,
-                           BOOL isRequiredProperty, BOOL isInstanceProperty)
-    OBJC_AVAILABLE(10.12, 10.0, 10.0, 3.0, 2.0);
-
-/** 
- * Returns an array of the protocols adopted by a protocol.
- * 
- * @param proto A protocol.
- * @param outCount Upon return, contains the number of elements in the returned array.
- * 
- * @return A C array of protocols adopted by \e proto. The array contains \e *outCount pointers
- *  followed by a \c NULL terminator. You must free the array with \c free().
- *  If the protocol declares no properties, \c NULL is returned and \c *outCount is \c 0.
- */
-OBJC_EXPORT Protocol * __unsafe_unretained _Nonnull * _Nullable
-protocol_copyProtocolList(Protocol * _Nonnull proto,
-                          unsigned int * _Nullable outCount)
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Creates a new protocol instance that cannot be used until registered with
- * \c objc_registerProtocol()
- * 
- * @param name The name of the protocol to create.
- *
- * @return The Protocol instance on success, \c nil if a protocol
- *  with the same name already exists. 
- * @note There is no dispose method for this. 
- */
-OBJC_EXPORT Protocol * _Nullable
-objc_allocateProtocol(const char * _Nonnull name) 
-    OBJC_AVAILABLE(10.7, 4.3, 9.0, 1.0, 2.0);
-
-/** 
- * Registers a newly constructed protocol with the runtime. The protocol
- * will be ready for use and is immutable after this.
- * 
- * @param proto The protocol you want to register.
- */
-OBJC_EXPORT void
-objc_registerProtocol(Protocol * _Nonnull proto) 
-    OBJC_AVAILABLE(10.7, 4.3, 9.0, 1.0, 2.0);
-
-/** 
- * Adds a method to a protocol. The protocol must be under construction.
- * 
- * @param proto The protocol to add a method to.
- * @param name The name of the method to add.
- * @param types A C string that represents the method signature.
- * @param isRequiredMethod YES if the method is not an optional method.
- * @param isInstanceMethod YES if the method is an instance method. 
- */
-OBJC_EXPORT void
-protocol_addMethodDescription(Protocol * _Nonnull proto, SEL _Nonnull name,
-                              const char * _Nullable types,
-                              BOOL isRequiredMethod, BOOL isInstanceMethod) 
-    OBJC_AVAILABLE(10.7, 4.3, 9.0, 1.0, 2.0);
-
-/** 
- * Adds an incorporated protocol to another protocol. The protocol being
- * added to must still be under construction, while the additional protocol
- * must be already constructed.
- * 
- * @param proto The protocol you want to add to, it must be under construction.
- * @param addition The protocol you want to incorporate into \e proto, it must be registered.
- */
-OBJC_EXPORT void
-protocol_addProtocol(Protocol * _Nonnull proto, Protocol * _Nonnull addition) 
-    OBJC_AVAILABLE(10.7, 4.3, 9.0, 1.0, 2.0);
-
-/** 
- * Adds a property to a protocol. The protocol must be under construction. 
- * 
- * @param proto The protocol to add a property to.
- * @param name The name of the property.
- * @param attributes An array of property attributes.
- * @param attributeCount The number of attributes in \e attributes.
- * @param isRequiredProperty YES if the property (accessor methods) is not optional. 
- * @param isInstanceProperty YES if the property (accessor methods) are instance methods. 
- *  This is the only case allowed fo a property, as a result, setting this to NO will 
- *  not add the property to the protocol at all. 
- */
-OBJC_EXPORT void
-protocol_addProperty(Protocol * _Nonnull proto, const char * _Nonnull name,
-                     const objc_property_attribute_t * _Nullable attributes,
-                     unsigned int attributeCount,
-                     BOOL isRequiredProperty, BOOL isInstanceProperty)
-    OBJC_AVAILABLE(10.7, 4.3, 9.0, 1.0, 2.0);
-
-
-/* Working with Libraries */
-
-/** 
- * Returns the names of all the loaded Objective-C frameworks and dynamic
- * libraries.
- * 
- * @param outCount The number of names returned.
- * 
- * @return An array of C strings of names. Must be free()'d by caller.
- */
-OBJC_EXPORT const char * _Nonnull * _Nonnull
-objc_copyImageNames(unsigned int * _Nullable outCount) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns the dynamic library name a class originated from.
- * 
- * @param cls The class you are inquiring about.
- * 
- * @return The name of the library containing this class.
- */
-OBJC_EXPORT const char * _Nullable
-class_getImageName(Class _Nullable cls) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns the names of all the classes within a library.
- * 
- * @param image The library or framework you are inquiring about.
- * @param outCount The number of class names returned.
- * 
- * @return An array of C strings representing the class names.
- */
-OBJC_EXPORT const char * _Nonnull * _Nullable
-objc_copyClassNamesForImage(const char * _Nonnull image,
-                            unsigned int * _Nullable outCount) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-
-/* Working with Selectors */
-
-/** 
- * Returns the name of the method specified by a given selector.
- * 
- * @param sel A pointer of type \c SEL. Pass the selector whose name you wish to determine.
- * 
- * @return A C string indicating the name of the selector.
- */
-OBJC_EXPORT const char * _Nonnull
-sel_getName(SEL _Nonnull sel)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
-
-
-/** 
- * Registers a method with the Objective-C runtime system, maps the method 
- * name to a selector, and returns the selector value.
- * 
- * @param str A pointer to a C string. Pass the name of the method you wish to register.
- * 
- * @return A pointer of type SEL specifying the selector for the named method.
- * 
- * @note You must register a method name with the Objective-C runtime system to obtain the
- *  method’s selector before you can add the method to a class definition. If the method name
- *  has already been registered, this function simply returns the selector.
- */
-OBJC_EXPORT SEL _Nonnull
-sel_registerName(const char * _Nonnull str)
-    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Returns a Boolean value that indicates whether two selectors are equal.
- * 
- * @param lhs The selector to compare with rhs.
- * @param rhs The selector to compare with lhs.
- * 
- * @return \c YES if \e lhs and \e rhs are equal, otherwise \c NO.
- * 
- * @note sel_isEqual is equivalent to ==.
- */
-OBJC_EXPORT BOOL
-sel_isEqual(SEL _Nonnull lhs, SEL _Nonnull rhs) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-
-/* Objective-C Language Features */
-
-/** 
- * This function is inserted by the compiler when a mutation
- * is detected during a foreach iteration. It gets called 
- * when a mutation occurs, and the enumerationMutationHandler
- * is enacted if it is set up. A fatal error occurs if a handler is not set up.
- *
- * @param obj The object being mutated.
- * 
- */
-OBJC_EXPORT void
-objc_enumerationMutation(id _Nonnull obj) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Sets the current mutation handler. 
- * 
- * @param handler Function pointer to the new mutation handler.
- */
-OBJC_EXPORT void
-objc_setEnumerationMutationHandler(void (*_Nullable handler)(id _Nonnull )) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Set the function to be called by objc_msgForward.
- * 
- * @param fwd Function to be jumped to by objc_msgForward.
- * @param fwd_stret Function to be jumped to by objc_msgForward_stret.
- * 
- * @see message.h::_objc_msgForward
- */
-OBJC_EXPORT void
-objc_setForwardHandler(void * _Nonnull fwd, void * _Nonnull fwd_stret) 
-    OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
-
-/** 
- * Creates a pointer to a function that will call the block
- * when the method is called.
- * 
- * @param block The block that implements this method. Its signature should
- *  be: method_return_type ^(id self, method_args...). 
- *  The selector is not available as a parameter to this block.
- *  The block is copied with \c Block_copy().
- * 
- * @return The IMP that calls this block. Must be disposed of with
- *  \c imp_removeBlock.
- */
-OBJC_EXPORT IMP _Nonnull
-imp_implementationWithBlock(id _Nonnull block)
-    OBJC_AVAILABLE(10.7, 4.3, 9.0, 1.0, 2.0);
-
-/** 
- * Return the block associated with an IMP that was created using
- * \c imp_implementationWithBlock.
- * 
- * @param anImp The IMP that calls this block.
- * 
- * @return The block called by \e anImp.
- */
-OBJC_EXPORT id _Nullable
-imp_getBlock(IMP _Nonnull anImp)
-    OBJC_AVAILABLE(10.7, 4.3, 9.0, 1.0, 2.0);
-
-/** 
- * Disassociates a block from an IMP that was created using
- * \c imp_implementationWithBlock and releases the copy of the 
- * block that was created.
- * 
- * @param anImp An IMP that was created using \c imp_implementationWithBlock.
- * 
- * @return YES if the block was released successfully, NO otherwise. 
- *  (For example, the block might not have been used to create an IMP previously).
- */
-OBJC_EXPORT BOOL
-imp_removeBlock(IMP _Nonnull anImp)
-    OBJC_AVAILABLE(10.7, 4.3, 9.0, 1.0, 2.0);
-
-/** 
- * This loads the object referenced by a weak pointer and returns it, after
- * retaining and autoreleasing the object to ensure that it stays alive
- * long enough for the caller to use it. This function would be used
- * anywhere a __weak variable is used in an expression.
- * 
- * @param location The weak pointer address
- * 
- * @return The object pointed to by \e location, or \c nil if \e *location is \c nil.
- */
-OBJC_EXPORT id _Nullable
-objc_loadWeak(id _Nullable * _Nonnull location)
-    OBJC_AVAILABLE(10.7, 5.0, 9.0, 1.0, 2.0);
-
-/** 
- * This function stores a new value into a __weak variable. It would
- * be used anywhere a __weak variable is the target of an assignment.
- * 
- * @param location The address of the weak pointer itself
- * @param obj The new object this weak ptr should now point to
- * 
- * @return The value stored into \e location, i.e. \e obj
- */
-OBJC_EXPORT id _Nullable
-objc_storeWeak(id _Nullable * _Nonnull location, id _Nullable obj) 
-    OBJC_AVAILABLE(10.7, 5.0, 9.0, 1.0, 2.0);
-
-
-/* Associative References */
 
 /**
- * Policies related to associative references.
- * These are options to objc_setAssociatedObject()
+ * Registers a new class and its metaclass with the runtime.  This function
+ * should be called after allocating a class with objc_allocateClassPair() and
+ * adding instance variables and methods to it.  A class can not have instance
+ * variables added to it after objc_registerClassPair() has been called.
  */
-typedef OBJC_ENUM(uintptr_t, objc_AssociationPolicy) {
-    OBJC_ASSOCIATION_ASSIGN = 0,           /**< Specifies a weak reference to the associated object. */
-    OBJC_ASSOCIATION_RETAIN_NONATOMIC = 1, /**< Specifies a strong reference to the associated object. 
-                                            *   The association is not made atomically. */
-    OBJC_ASSOCIATION_COPY_NONATOMIC = 3,   /**< Specifies that the associated object is copied. 
-                                            *   The association is not made atomically. */
-    OBJC_ASSOCIATION_RETAIN = 01401,       /**< Specifies a strong reference to the associated object.
-                                            *   The association is made atomically. */
-    OBJC_ASSOCIATION_COPY = 01403          /**< Specifies that the associated object is copied.
-                                            *   The association is made atomically. */
+OBJC_PUBLIC
+void objc_registerClassPair(Class cls);
+
+/**
+ * Returns a pointer immediately after the instance variables declared in an
+ * object.  This is a pointer to the storage specified with the extraBytes
+ * parameter given when allocating an object.
+ */
+OBJC_PUBLIC
+void *object_getIndexedIvars(id obj);
+
+// FIXME: The GNU runtime has a version of this which omits the size parameter
+//id object_copy(id obj, size_t size);
+
+/**
+ * Free an object created with class_createInstance().
+ */
+OBJC_PUBLIC
+id object_dispose(id obj);
+
+/**
+ * Returns the class of the object.  Note: the isa pointer should not be
+ * accessed directly with the GNUstep runtime.
+ */
+OBJC_PUBLIC
+Class object_getClass(id obj);
+
+/**
+ * Sets the class of the object.  Note: the isa pointer should not be
+ * accessed directly with the GNUstep runtime.
+ */
+OBJC_PUBLIC
+Class object_setClass(id obj, Class cls);
+
+/**
+ * Returns the name of the class of the object.  This is equivalent to calling
+ * class_getName() on the result of object_getClass().
+ */
+OBJC_PUBLIC
+const char *object_getClassName(id obj);
+
+
+/**
+ * Returns the name of a specified property.
+ */
+OBJC_PUBLIC
+const char *property_getName(objc_property_t property);
+
+/**
+ * Returns the attributes for the specified property.  This is similar to an
+ * Objective-C type encoding, but contains some extra information.  A full
+ * description of the format for this string may be found in Apple's
+ * Objective-C Runtime Programming Guide.
+ */
+OBJC_PUBLIC
+const char *property_getAttributes(objc_property_t property);
+
+/**
+ * Returns an array of attributes for this property.
+ */
+OBJC_PUBLIC
+objc_property_attribute_t *property_copyAttributeList(objc_property_t property,
+                                                      unsigned int *outCount);
+/**
+ * Adds a property to the class, given a specified set of attributes.  Note
+ * that this only sets the property metadata.  The property accessor methods
+ * must already be created.
+ */
+OBJC_PUBLIC
+BOOL class_addProperty(Class cls,
+                       const char *name,
+                       const objc_property_attribute_t *attributes, 
+                       unsigned int attributeCount);
+
+/**
+ * Replaces property metadata.  If the property does not exist, then this is
+ * equivalent to calling class_addProperty().
+ */
+OBJC_PUBLIC
+void class_replaceProperty(Class cls,
+                           const char *name,
+                           const objc_property_attribute_t *attributes,
+                           unsigned int attributeCount);
+
+/**
+ * Returns a copy of a single attribute.
+ */
+OBJC_PUBLIC
+char *property_copyAttributeValue(objc_property_t property,
+                                  const char *attributeName);
+
+/**
+ * Testswhether a protocol conforms to another protocol.
+ */
+OBJC_PUBLIC
+BOOL protocol_conformsToProtocol(Protocol *p, Protocol *other);
+
+/**
+ * Returns an array of method descriptions.  Stores the number of elements in
+ * the array in the variable pointed to by the last parameter.  The caller is
+ * responsible for freeing this array.
+ */
+OBJC_PUBLIC
+struct objc_method_description *protocol_copyMethodDescriptionList(Protocol *p,
+	BOOL isRequiredMethod, BOOL isInstanceMethod, unsigned int *count);
+
+/**
+ * Returns an array of required instance properties, with the number being
+ * stored in the variable pointed to by the last argument.  The caller is
+ * responsible for freeing the returned array.
+ */
+OBJC_PUBLIC
+objc_property_t *protocol_copyPropertyList(Protocol *p, unsigned int *count);
+
+/**
+ * Returns an array of properties specified by this class, with the number
+ * being stored in the variable pointed to by the last argument.  The caller is
+ * responsible for freeing the returned array.
+ */
+OBJC_PUBLIC
+objc_property_t *protocol_copyPropertyList2(Protocol *p, unsigned int *count,
+	BOOL isRequiredProperty, BOOL isInstanceProperty);
+
+/**
+ * Returns an array of protocols that this protocol conforms to, with the
+ * number of protocols in the array being returned via the last argument.  The
+ * caller is responsible for freeing this array.
+ */
+OBJC_PUBLIC
+Protocol *__unsafe_unretained*protocol_copyProtocolList(Protocol *p, unsigned int *count);
+
+/**
+ * Returns all of the protocols that the runtime is aware of.  Note that
+ * protocols compiled by GCC and not attacked to classes may not have been
+ * registered with the runtime.  The number of protocols returned is stored at
+ * the address indicated by the pointer argument.
+ *
+ * The caller is responsible for freeing the returned array.
+ */
+OBJC_PUBLIC
+Protocol *__unsafe_unretained*objc_copyProtocolList(unsigned int *outCount);
+/**
+ * Returns the method description for the specified method within a given
+ * protocol.
+ */
+OBJC_PUBLIC
+struct objc_method_description protocol_getMethodDescription(Protocol *p,
+	SEL aSel, BOOL isRequiredMethod, BOOL isInstanceMethod);
+
+/**
+ * Returns the extended type encoding of the specified method.
+ * 
+ * Note: This function is used by JavaScriptCore but is not public in Apple's
+ * implementation and so its semantics may change in the future and this
+ * runtime may diverge from Apple's.
+ */
+OBJC_PUBLIC
+const char *_protocol_getMethodTypeEncoding(Protocol *p, SEL aSel,
+	BOOL isRequiredMethod, BOOL isInstanceMethod);
+
+/**
+ * Returns the name of the specified protocol.
+ */
+OBJC_PUBLIC
+const char* protocol_getName(Protocol *p);
+
+/**
+ * Returns the property metadata for the property with the specified name.
+ */
+OBJC_PUBLIC
+objc_property_t protocol_getProperty(Protocol *p, const char *name,
+	BOOL isRequiredProperty, BOOL isInstanceProperty);
+
+/**
+ * Compares two protocols.  Currently, protocols are assumed to be equal if
+ * their names match.  This is required for compatibility with the GCC ABI,
+ * which made not attempt to unique protocols (or even register them with the
+ * runtime).
+ */
+OBJC_PUBLIC
+BOOL protocol_isEqual(Protocol *p, Protocol *other);
+
+/**
+ * The message lookup function used by the GCC ABI.  This returns a pointer to
+ * the function (either a method or a forwarding hook) that should be called in
+ * response to a given message.
+ */
+OBJC_PUBLIC
+IMP objc_msg_lookup(id, SEL) OBJC_NONPORTABLE;
+/**
+ * The message lookup function used for messages sent to super in the GCC ABI.
+ * This specifies both the class and the 
+ */
+OBJC_PUBLIC
+IMP objc_msg_lookup_super(struct objc_super*, SEL) OBJC_NONPORTABLE;
+
+/**
+ * Returns the name of the specified selector.
+ */
+OBJC_PUBLIC
+const char *sel_getName(SEL sel);
+
+/**
+ * Registers a selector with the runtime.  This is equivalent to sel_registerName().
+ */
+OBJC_PUBLIC
+SEL sel_getUid(const char *selName);
+
+/**
+ * Returns whether two selectors are equal.  For the purpose of comparison,
+ * selectors with the same name and type are regarded as equal.  Selectors with
+ * the same name and different types are regarded as different.  If one
+ * selector is typed and the other is untyped, but the names are the same, then
+ * they are regarded as equal.  This means that sel_isEqual(a, b) and
+ * sel_isEqual(a, c) does not imply sel_isEqual(b, c) - if a is untyped but
+ * both b and c are typed selectors with different types, then then the first
+ * two will return YES, but the third case will return NO.
+ */
+OBJC_PUBLIC
+BOOL sel_isEqual(SEL sel1, SEL sel2);
+
+/**
+ * Registers an untyped selector with the runtime.
+ */
+OBJC_PUBLIC
+SEL sel_registerName(const char *selName);
+
+/**
+ * Register a typed selector.
+ */
+OBJC_PUBLIC
+SEL sel_registerTypedName_np(const char *selName, const char *types) OBJC_NONPORTABLE;
+
+/**
+ * Returns the type encoding associated with a selector, or the empty string is
+ * there is no such type.
+ */
+OBJC_PUBLIC
+const char *sel_getType_np(SEL aSel) OBJC_NONPORTABLE;
+
+/**
+ * Enumerates all of the type encodings associated with a given selector name
+ * (up to a specified limit).  This function returns the number of types that
+ * exist for a specific selector, but only copies up to count of them into the
+ * array passed as the types argument.  This allows you to call the function
+ * once with a relatively small on-stack buffer and then only call it again
+ * with a heap-allocated buffer if there is not enough space.
+ */
+OBJC_PUBLIC
+unsigned sel_copyTypes_np(const char *selName, const char **types, unsigned count) OBJC_NONPORTABLE;
+
+/**
+ * Enumerates all of the type encodings associated with a given selector name
+ * (up to a specified limit).  This function returns the number of types that
+ * exist for a specific selector, but only copies up to count of them into the
+ * array passed as the types argument.  This allows you to call the function
+ * once with a relatively small on-stack buffer and then only call it again
+ * with a heap-allocated buffer if there is not enough space.
+ */
+OBJC_PUBLIC
+unsigned sel_copyTypedSelectors_np(const char *selName, SEL *const sels, unsigned count) OBJC_NONPORTABLE;
+
+/**
+ * New ABI lookup function.  Receiver may be modified during lookup or proxy
+ * forwarding and the sender may affect how lookup occurs.
+ */
+OBJC_PUBLIC
+extern struct objc_slot *objc_msg_lookup_sender(id *receiver, SEL selector, id sender)
+	OBJC_NONPORTABLE OBJC_DEPRECATED;
+
+/**
+ * Deprecated function for accessing a slot without going via any forwarding
+ * mechanisms.
+ */
+OBJC_PUBLIC
+extern struct objc_slot *objc_get_slot(Class, SEL)
+	OBJC_NONPORTABLE OBJC_DEPRECATED;
+
+/**
+ * Look up a slot, without invoking any forwarding mechanisms.  The third
+ * parameter is used to return a pointer to the current value of the version
+ * counter.  If this value is equal to `objc_method_cache_version` then the
+ * slot is safe to reuse without performing another lookup.
+ */
+OBJC_PUBLIC
+extern struct objc_slot2 *objc_get_slot2(Class, SEL, uint64_t*)
+	OBJC_NONPORTABLE;
+
+/**
+ * Look up a slot, invoking any required forwarding mechanisms.  The third
+ * parameter is used to return a pointer to the current value of the version
+ * counter.  If this value is equal to `objc_method_cache_version` then the
+ * slot is safe to reuse without performing another lookup.
+ */
+OBJC_PUBLIC
+extern struct objc_slot2 *objc_slot_lookup_version(id *receiver, SEL selector, uint64_t*)
+	OBJC_NONPORTABLE;
+
+/**
+ * Look up a slot, invoking any required forwarding mechanisms.
+ */
+OBJC_PUBLIC
+extern IMP objc_msg_lookup2(id *receiver, SEL selector) OBJC_NONPORTABLE;
+
+/**
+ * Registers a class for small objects.  Small objects are stored inside a
+ * pointer.  If the class can be registered, then this returns YES.  The second
+ * argument specifies the bit pattern to use to identify the small object.
+ */
+OBJC_PUBLIC
+BOOL objc_registerSmallObjectClass_np(Class cls, uintptr_t classId);
+
+/**
+ * The mask identifying the bits that can be used in an object pointer to
+ * identify a small object.  On 32-bit systems, we use the low bit.  On 64-bit
+ * systems, we use the low 3 bits.  In both cases, the lowest bit must be 1.
+ * This restriction may be relaxed in the future on 64-bit systems.
+ */
+#ifndef UINTPTR_MAX
+#	define OBJC_SMALL_OBJECT_MASK ((sizeof(void*) == 4) ? 1 : 7)
+#elif UINTPTR_MAX < UINT64_MAX
+#	define OBJC_SMALL_OBJECT_MASK 1
+#else
+#	define OBJC_SMALL_OBJECT_MASK 7
+#endif
+/**
+ * The number of bits reserved for the class identifier in a small object.
+ */
+#ifndef UINTPTR_MAX
+#	define OBJC_SMALL_OBJECT_SHIFT ((sizeof(void*) == 4) ? 1 : 3)
+#elif UINTPTR_MAX < UINT64_MAX
+#	define OBJC_SMALL_OBJECT_SHIFT 1
+#else
+#	define OBJC_SMALL_OBJECT_SHIFT 3
+#endif
+
+
+/**
+ * Valid values for objc_AssociationPolicy.  This is really a bitfield, but
+ * only specific combinations of flags are permitted.
+ */
+enum
+{
+	/**
+	 * Perform straight assignment, no message sends.
+	 */
+	OBJC_ASSOCIATION_ASSIGN = 0,
+	/**
+	 * Retain the associated object.
+	 */
+	OBJC_ASSOCIATION_RETAIN_NONATOMIC = 1,
+	/**
+	 * Copy the associated object, by sending it a -copy message.
+	 */
+	OBJC_ASSOCIATION_COPY_NONATOMIC = 3,
+	/**
+	 * Atomic retain.
+	 */
+	OBJC_ASSOCIATION_RETAIN = 0x301,
+	/**
+	 * Atomic copy.
+	 */
+	OBJC_ASSOCIATION_COPY = 0x303
 };
-
-/** 
- * Sets an associated value for a given object using a given key and association policy.
- * 
- * @param object The source object for the association.
- * @param key The key for the association.
- * @param value The value to associate with the key key for object. Pass nil to clear an existing association.
- * @param policy The policy for the association. For possible values, see “Associative Object Behaviors.”
- * 
- * @see objc_setAssociatedObject
- * @see objc_removeAssociatedObjects
+/**
+ * Association policy, used when setting associated objects.  
  */
-OBJC_EXPORT void
-objc_setAssociatedObject(id _Nonnull object, const void * _Nonnull key,
-                         id _Nullable value, objc_AssociationPolicy policy)
-    OBJC_AVAILABLE(10.6, 3.1, 9.0, 1.0, 2.0);
-
-/** 
- * Returns the value associated with a given object for a given key.
- * 
- * @param object The source object for the association.
- * @param key The key for the association.
- * 
- * @return The value associated with the key \e key for \e object.
- * 
- * @see objc_setAssociatedObject
- */
-OBJC_EXPORT id _Nullable
-objc_getAssociatedObject(id _Nonnull object, const void * _Nonnull key)
-    OBJC_AVAILABLE(10.6, 3.1, 9.0, 1.0, 2.0);
-
-/** 
- * Removes all associations for a given object.
- * 
- * @param object An object that maintains associated objects.
- * 
- * @note The main purpose of this function is to make it easy to return an object 
- *  to a "pristine state”. You should not use this function for general removal of
- *  associations from objects, since it also removes associations that other clients
- *  may have added to the object. Typically you should use \c objc_setAssociatedObject 
- *  with a nil value to clear an association.
- * 
- * @see objc_setAssociatedObject
- * @see objc_getAssociatedObject
- */
-OBJC_EXPORT void
-objc_removeAssociatedObjects(id _Nonnull object)
-    OBJC_AVAILABLE(10.6, 3.1, 9.0, 1.0, 2.0);
-
-
-/* Hooks for Swift */
+typedef uintptr_t objc_AssociationPolicy;
 
 /**
- * Function type for a hook that intercepts class_getImageName().
- *
- * @param cls The class whose image name is being looked up.
- * @param outImageName On return, the result of the image name lookup.
- * @return YES if an image name for this class was found, NO otherwise.
- *
- * @see class_getImageName
- * @see objc_setHook_getImageName
+ * Returns an object previously stored by calling objc_setAssociatedObject()
+ * with the same arguments, or nil if none exists.
  */
-typedef BOOL (*objc_hook_getImageName)(Class _Nonnull cls, const char * _Nullable * _Nonnull outImageName);
+OBJC_PUBLIC
+id objc_getAssociatedObject(id object, void *key);
+/**
+ * Associates an object with another.  This provides a mechanism for storing
+ * extra state with an object, beyond its declared instance variables.  The
+ * pointer used as a key is treated as an opaque value.  The best way of
+ * ensuring this is to pass the pointer to a static variable as the key.  The
+ * value may be any object, but must respond to -copy or -retain, and -release,
+ * if an association policy of copy or retain is passed as the final argument.
+ */
+OBJC_PUBLIC
+void objc_setAssociatedObject(id object, void *key, id value, objc_AssociationPolicy policy);
+/**
+ * Removes all associations from an object.  
+ */
+OBJC_PUBLIC
+void objc_removeAssociatedObjects(id object);
 
 /**
- * Install a hook for class_getImageName().
- *
- * @param newValue The hook function to install.
- * @param outOldValue The address of a function pointer variable. On return,
- *  the old hook function is stored in the variable.
- *
- * @note The store to *outOldValue is thread-safe: the variable will be
- *  updated before class_getImageName() calls your new hook to read it,
- *  even if your new hook is called from another thread before this
- *  setter completes.
- * @note The first hook in the chain is the native implementation of
- *  class_getImageName(). Your hook should call the previous hook for
- *  classes that you do not recognize.
- *
- * @see class_getImageName
- * @see objc_hook_getImageName
+ * Converts a block into an IMP that can be used as a method.  The block should
+ * take an object pointer (self) as its first argument, and then the same
+ * arguments as the method.
  */
-OBJC_EXPORT void objc_setHook_getImageName(objc_hook_getImageName _Nonnull newValue,
-                                           objc_hook_getImageName _Nullable * _Nonnull outOldValue)
-    OBJC_AVAILABLE(10.14, 12.0, 12.0, 5.0, 3.0);
+OBJC_PUBLIC
+IMP imp_implementationWithBlock(void *block);
+/**
+ * Returns the type encoding of an IMP that would be returned by passing the
+ * block to imp_implementationWithBlock().  Returns NULL if this is not a valid
+ * block encoding for transforming to an IMP (it must take id as its first
+ * argument).  The caller is responsible for freeing the returned value.
+ */
+OBJC_PUBLIC
+char *block_copyIMPTypeEncoding_np(void*block);
+/**
+ * Returns the block that was used in an IMP created by
+ * imp_implementationWithBlock().  The result of calling this function with any
+ * other IMP is undefined.
+ */
+OBJC_PUBLIC
+void *imp_getBlock(IMP anImp);
+/**
+ * Removes a block that was converted to an IMP with
+ * imp_implementationWithBlock().  The result of calling this function with any
+ * other IMP is undefined.  Returns YES on success, NO on failure.
+ */
+OBJC_PUBLIC
+BOOL imp_removeBlock(IMP anImp);
+
+/**
+ * Adds a method to a specific object,  This method will not be added to any
+ * other instances of the same class.
+ */
+OBJC_PUBLIC
+BOOL object_addMethod_np(id object, SEL name, IMP imp, const char *types);
+
+/**
+ * Replaces a method on a specific object,  This method will not be added to
+ * any other instances of the same class.
+ */
+OBJC_PUBLIC
+IMP object_replaceMethod_np(id object, SEL name, IMP imp, const char *types);
+
+/**
+ * Creates a clone, in the JavaScript sense - an object which inherits both
+ * associated references and methods from the original object.
+ */
+OBJC_PUBLIC
+id object_clone_np(id object);
+
+/**
+ * Returns the prototype of the object if it was created with
+ * object_clone_np(), or nil otherwise.
+ */
+OBJC_PUBLIC
+id object_getPrototype_np(id object);
+
+/**
+ * Toggles whether Objective-C objects caught in C++ exception handlers in
+ * Objective-C++ mode should follow Objective-C or C++ semantics.  The obvious
+ * choice is for them to follow C++ semantics, because people using a C++
+ * language construct would intuitively expect them to have C++ semantics,
+ * where the catch behaviour depends on the static type of the thrown object,
+ * not its run-time type.
+ *
+ * Apple, therefore, chose the other option.
+ *
+ * We default to Apple-compatible mode, but can enable the sane behaviour if
+ * the user opts in.  Note that doing this when linking against third-party
+ * frameworks written in Objective-C++ 2 may cause weird problems if the expect
+ * the other behaviour.
+ *
+ * This currently sets a global value.  In the future, it may be configurable
+ * on a per-thread basis.
+ */
+OBJC_PUBLIC
+int objc_set_apple_compatible_objcxx_exceptions(int newValue) OBJC_NONPORTABLE;
 
 
 #define _C_ID       '@'
 #define _C_CLASS    '#'
 #define _C_SEL      ':'
+#define _C_BOOL     'B'
+
 #define _C_CHR      'c'
 #define _C_UCHR     'C'
 #define _C_SHT      's'
@@ -1742,15 +1166,18 @@ OBJC_EXPORT void objc_setHook_getImageName(objc_hook_getImageName _Nonnull newVa
 #define _C_ULNG     'L'
 #define _C_LNG_LNG  'q'
 #define _C_ULNG_LNG 'Q'
+
 #define _C_FLT      'f'
 #define _C_DBL      'd'
+
 #define _C_BFLD     'b'
-#define _C_BOOL     'B'
 #define _C_VOID     'v'
 #define _C_UNDEF    '?'
 #define _C_PTR      '^'
+
 #define _C_CHARPTR  '*'
 #define _C_ATOM     '%'
+
 #define _C_ARY_B    '['
 #define _C_ARY_E    ']'
 #define _C_UNION_B  '('
@@ -1758,293 +1185,19 @@ OBJC_EXPORT void objc_setHook_getImageName(objc_hook_getImageName _Nonnull newVa
 #define _C_STRUCT_B '{'
 #define _C_STRUCT_E '}'
 #define _C_VECTOR   '!'
+
+#define _C_COMPLEX  'j'
 #define _C_CONST    'r'
+#define _C_IN       'n'
+#define _C_INOUT    'N'
+#define _C_OUT      'o'
+#define _C_BYCOPY   'O'
+#define _C_ONEWAY   'V'
 
+#include "runtime-deprecated.h"
 
-/* Obsolete types */
-
-#if !__OBJC2__
-
-#define CLS_GETINFO(cls,infomask)        ((cls)->info & (infomask))
-#define CLS_SETINFO(cls,infomask)        ((cls)->info |= (infomask))
-
-// class is not a metaclass
-#define CLS_CLASS               0x1
-// class is a metaclass
-#define CLS_META                0x2
-// class's +initialize method has completed
-#define CLS_INITIALIZED         0x4
-// class is posing
-#define CLS_POSING              0x8
-// unused
-#define CLS_MAPPED              0x10
-// class and subclasses need cache flush during image loading
-#define CLS_FLUSH_CACHE         0x20
-// method cache should grow when full
-#define CLS_GROW_CACHE          0x40
-// unused
-#define CLS_NEED_BIND           0x80
-// methodLists is array of method lists
-#define CLS_METHOD_ARRAY        0x100
-// the JavaBridge constructs classes with these markers
-#define CLS_JAVA_HYBRID         0x200
-#define CLS_JAVA_CLASS          0x400
-// thread-safe +initialize
-#define CLS_INITIALIZING        0x800
-// bundle unloading
-#define CLS_FROM_BUNDLE         0x1000
-// C++ ivar support
-#define CLS_HAS_CXX_STRUCTORS   0x2000
-// Lazy method list arrays
-#define CLS_NO_METHOD_ARRAY     0x4000
-// +load implementation
-#define CLS_HAS_LOAD_METHOD     0x8000
-// objc_allocateClassPair API
-#define CLS_CONSTRUCTING        0x10000
-// class compiled with bigger class structure
-#define CLS_EXT                 0x20000
-
-
-struct objc_method_description_list {
-    int count;
-    struct objc_method_description list[1];
-};
-
-
-struct objc_protocol_list {
-    struct objc_protocol_list * _Nullable next;
-    long count;
-    __unsafe_unretained Protocol * _Nullable list[1];
-};
-
-
-struct objc_category {
-    char * _Nonnull category_name                            OBJC2_UNAVAILABLE;
-    char * _Nonnull class_name                               OBJC2_UNAVAILABLE;
-    struct objc_method_list * _Nullable instance_methods     OBJC2_UNAVAILABLE;
-    struct objc_method_list * _Nullable class_methods        OBJC2_UNAVAILABLE;
-    struct objc_protocol_list * _Nullable protocols          OBJC2_UNAVAILABLE;
-}                                                            OBJC2_UNAVAILABLE;
-
-
-struct objc_ivar {
-    char * _Nullable ivar_name                               OBJC2_UNAVAILABLE;
-    char * _Nullable ivar_type                               OBJC2_UNAVAILABLE;
-    int ivar_offset                                          OBJC2_UNAVAILABLE;
-#ifdef __LP64__
-    int space                                                OBJC2_UNAVAILABLE;
-#endif
-}                                                            OBJC2_UNAVAILABLE;
-
-struct objc_ivar_list {
-    int ivar_count                                           OBJC2_UNAVAILABLE;
-#ifdef __LP64__
-    int space                                                OBJC2_UNAVAILABLE;
-#endif
-    /* variable length structure */
-    struct objc_ivar ivar_list[1]                            OBJC2_UNAVAILABLE;
-}                                                            OBJC2_UNAVAILABLE;
-
-
-struct objc_method {
-    SEL _Nonnull method_name                                 OBJC2_UNAVAILABLE;
-    char * _Nullable method_types                            OBJC2_UNAVAILABLE;
-    IMP _Nonnull method_imp                                  OBJC2_UNAVAILABLE;
-}                                                            OBJC2_UNAVAILABLE;
-
-struct objc_method_list {
-    struct objc_method_list * _Nullable obsolete             OBJC2_UNAVAILABLE;
-
-    int method_count                                         OBJC2_UNAVAILABLE;
-#ifdef __LP64__
-    int space                                                OBJC2_UNAVAILABLE;
-#endif
-    /* variable length structure */
-    struct objc_method method_list[1]                        OBJC2_UNAVAILABLE;
-}                                                            OBJC2_UNAVAILABLE;
-
-
-typedef struct objc_symtab *Symtab                           OBJC2_UNAVAILABLE;
-
-struct objc_symtab {
-    unsigned long sel_ref_cnt                                OBJC2_UNAVAILABLE;
-    SEL _Nonnull * _Nullable refs                            OBJC2_UNAVAILABLE;
-    unsigned short cls_def_cnt                               OBJC2_UNAVAILABLE;
-    unsigned short cat_def_cnt                               OBJC2_UNAVAILABLE;
-    void * _Nullable defs[1] /* variable size */             OBJC2_UNAVAILABLE;
-}                                                            OBJC2_UNAVAILABLE;
-
-
-typedef struct objc_cache *Cache                             OBJC2_UNAVAILABLE;
-
-#define CACHE_BUCKET_NAME(B)  ((B)->method_name)
-#define CACHE_BUCKET_IMP(B)   ((B)->method_imp)
-#define CACHE_BUCKET_VALID(B) (B)
-#ifndef __LP64__
-#define CACHE_HASH(sel, mask) (((uintptr_t)(sel)>>2) & (mask))
-#else
-#define CACHE_HASH(sel, mask) (((unsigned int)((uintptr_t)(sel)>>3)) & (mask))
-#endif
-struct objc_cache {
-    unsigned int mask /* total = mask + 1 */                 OBJC2_UNAVAILABLE;
-    unsigned int occupied                                    OBJC2_UNAVAILABLE;
-    Method _Nullable buckets[1]                              OBJC2_UNAVAILABLE;
-};
-
-
-typedef struct objc_module *Module                           OBJC2_UNAVAILABLE;
-
-struct objc_module {
-    unsigned long version                                    OBJC2_UNAVAILABLE;
-    unsigned long size                                       OBJC2_UNAVAILABLE;
-    const char * _Nullable name                              OBJC2_UNAVAILABLE;
-    Symtab _Nullable symtab                                  OBJC2_UNAVAILABLE;
-}                                                            OBJC2_UNAVAILABLE;
-
-#else
-
-struct objc_method_list;
-
+#ifdef __cplusplus
+}
 #endif
 
-
-/* Obsolete functions */
-
-OBJC_EXPORT IMP _Nullable
-class_lookupMethod(Class _Nullable cls, SEL _Nonnull sel) 
-    __OSX_DEPRECATED(10.0, 10.5, "use class_getMethodImplementation instead") 
-    __IOS_DEPRECATED(2.0, 2.0, "use class_getMethodImplementation instead") 
-    __TVOS_DEPRECATED(9.0, 9.0, "use class_getMethodImplementation instead") 
-    __WATCHOS_DEPRECATED(1.0, 1.0, "use class_getMethodImplementation instead")
-    ;
-OBJC_EXPORT BOOL
-class_respondsToMethod(Class _Nullable cls, SEL _Nonnull sel)
-    __OSX_DEPRECATED(10.0, 10.5, "use class_respondsToSelector instead") 
-    __IOS_DEPRECATED(2.0, 2.0, "use class_respondsToSelector instead") 
-    __TVOS_DEPRECATED(9.0, 9.0, "use class_respondsToSelector instead") 
-    __WATCHOS_DEPRECATED(1.0, 1.0, "use class_respondsToSelector instead")
-    ;
-
-OBJC_EXPORT void
-_objc_flush_caches(Class _Nullable cls) 
-    __OSX_DEPRECATED(10.0, 10.5, "not recommended") 
-    __IOS_DEPRECATED(2.0, 2.0, "not recommended") 
-    __TVOS_DEPRECATED(9.0, 9.0, "not recommended") 
-    __WATCHOS_DEPRECATED(1.0, 1.0, "not recommended")
-    ;
-
-OBJC_EXPORT id _Nullable
-object_copyFromZone(id _Nullable anObject, size_t nBytes, void * _Nullable z) 
-    __OSX_DEPRECATED(10.0, 10.5, "use object_copy instead") 
-    __IOS_UNAVAILABLE __TVOS_UNAVAILABLE
-    __WATCHOS_UNAVAILABLE 
-    OBJC_ARC_UNAVAILABLE;
-
-OBJC_EXPORT id _Nullable
-object_realloc(id _Nullable anObject, size_t nBytes)
-    OBJC2_UNAVAILABLE;
-
-OBJC_EXPORT id _Nullable
-object_reallocFromZone(id _Nullable anObject, size_t nBytes, void * _Nullable z)
-    OBJC2_UNAVAILABLE;
-
-#define OBSOLETE_OBJC_GETCLASSES 1
-OBJC_EXPORT void * _Nonnull
-objc_getClasses(void)
-    OBJC2_UNAVAILABLE;
-
-OBJC_EXPORT void
-objc_addClass(Class _Nonnull myClass)
-    OBJC2_UNAVAILABLE;
-
-OBJC_EXPORT void
-objc_setClassHandler(int (* _Nullable )(const char * _Nonnull))
-    OBJC2_UNAVAILABLE;
-
-OBJC_EXPORT void
-objc_setMultithreaded(BOOL flag)
-    OBJC2_UNAVAILABLE;
-
-OBJC_EXPORT id _Nullable
-class_createInstanceFromZone(Class _Nullable, size_t idxIvars,
-                             void * _Nullable z)
-    __OSX_DEPRECATED(10.0, 10.5, "use class_createInstance instead") 
-    __IOS_UNAVAILABLE __TVOS_UNAVAILABLE
-    __WATCHOS_UNAVAILABLE 
-    OBJC_ARC_UNAVAILABLE;
-
-OBJC_EXPORT void
-class_addMethods(Class _Nullable, struct objc_method_list * _Nonnull)
-    OBJC2_UNAVAILABLE;
-
-OBJC_EXPORT void
-class_removeMethods(Class _Nullable, struct objc_method_list * _Nonnull)
-    OBJC2_UNAVAILABLE;
-
-OBJC_EXPORT void
-_objc_resolve_categories_for_class(Class _Nonnull cls)
-    OBJC2_UNAVAILABLE;
-
-OBJC_EXPORT Class _Nonnull
-class_poseAs(Class _Nonnull imposter, Class _Nonnull original)
-    OBJC2_UNAVAILABLE;
-
-OBJC_EXPORT unsigned int
-method_getSizeOfArguments(Method _Nonnull m)
-    OBJC2_UNAVAILABLE;
-
-OBJC_EXPORT unsigned
-method_getArgumentInfo(struct objc_method * _Nonnull m, int arg,
-                       const char * _Nullable * _Nonnull type,
-                       int * _Nonnull offset)
-    UNAVAILABLE_ATTRIBUTE  // This function was accidentally deleted in 10.9.
-    OBJC2_UNAVAILABLE;
-
-OBJC_EXPORT Class _Nullable
-objc_getOrigClass(const char * _Nonnull name)
-    OBJC2_UNAVAILABLE;
-
-#define OBJC_NEXT_METHOD_LIST 1
-OBJC_EXPORT struct objc_method_list * _Nullable
-class_nextMethodList(Class _Nullable, void * _Nullable * _Nullable)
-    OBJC2_UNAVAILABLE;
-// usage for nextMethodList
-//
-// void *iterator = 0;
-// struct objc_method_list *mlist;
-// while ( mlist = class_nextMethodList( cls, &iterator ) )
-//    ;
- 
-OBJC_EXPORT id _Nullable
-(* _Nonnull _alloc)(Class _Nullable, size_t)
-    OBJC2_UNAVAILABLE;
-
-OBJC_EXPORT id _Nullable
-(* _Nonnull _copy)(id _Nullable, size_t)
-     OBJC2_UNAVAILABLE;
-     
-OBJC_EXPORT id _Nullable
-(* _Nonnull _realloc)(id _Nullable, size_t)
-     OBJC2_UNAVAILABLE;
-
-OBJC_EXPORT id _Nullable
-(* _Nonnull _dealloc)(id _Nullable)
-     OBJC2_UNAVAILABLE;
-     
-OBJC_EXPORT id _Nullable
-(* _Nonnull _zoneAlloc)(Class _Nullable, size_t, void * _Nullable)
-     OBJC2_UNAVAILABLE;
-     
-OBJC_EXPORT id _Nullable
-(* _Nonnull _zoneRealloc)(id _Nullable, size_t, void * _Nullable)
-     OBJC2_UNAVAILABLE;
-     
-OBJC_EXPORT id _Nullable
-(* _Nonnull _zoneCopy)(id _Nullable, size_t, void * _Nullable)
-     OBJC2_UNAVAILABLE;
-     
-OBJC_EXPORT void
-(* _Nonnull _error)(id _Nullable, const char * _Nonnull, va_list)
-     OBJC2_UNAVAILABLE;
-
-#endif
+#endif // __LIBOBJC_RUNTIME_H_INCLUDED__
