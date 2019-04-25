@@ -33,7 +33,8 @@
         _section.offset    = [cursor readInt32];
         uint32_t dyldOffset = (uint32_t)(_section.addr - segment.vmaddr + segment.fileoff);
         if (_section.offset > 0 && _section.offset != dyldOffset) {
-            fprintf(stderr, "Warning: Invalid section offset 0x%08x replaced with 0x%08x in %s,%s\n", _section.offset, dyldOffset, [_segmentName UTF8String], [_sectionName UTF8String]);
+	    //TODO: implement this feature in future.
+	    //fprintf(stderr, "Warning: Invalid section offset 0x%08x replaced with 0x%08x in %s,%s\n", _section.offset, dyldOffset, [_segmentName UTF8String], [_sectionName UTF8String]);
             _section.offset = dyldOffset;
         }
         _section.align     = [cursor readInt32];

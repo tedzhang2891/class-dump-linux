@@ -201,7 +201,7 @@
 - (NSUInteger)baseAddress;
 {
     if (_flags.didFindBaseAddress == NO && _flags.didWarnAboutUnfoundBaseAddress == NO) {
-        fprintf(stderr, "Warning: Couldn't find first read/write segment for base address of relocation entries.\n");
+        //fprintf(stderr, "Warning: Couldn't find first read/write segment for base address of relocation entries.\n");
         _flags.didWarnAboutUnfoundBaseAddress = YES;
     }
 

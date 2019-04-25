@@ -19,22 +19,22 @@ include $(GNUSTEP_MAKEFILES)/common.make
 # Tool
 #
 VERSION = 0.1
-PACKAGE_NAME = ObjCDumper
-TOOL_NAME = ObjCDumper
-ObjCDumper_TOOL_ICON =
+PACKAGE_NAME = MachObjC
+LIBRARY_NAME = MachObjC
+MachObjC_TOOL_ICON =
 
 
 #
 # Resource files
 #
-ObjCDumper_RESOURCE_FILES = \
+MachObjC_RESOURCE_FILES = \
 #Resources/Info-gnustep.plist \
 
 
 #
 # Header files
 #
-ObjCDumper_HEADER_FILES = \
+MachObjC_HEADER_FILES = \
 CDLCBuildVersion.h \
 CDOCClassReference.h \
 CDLCFunctionStarts.h \
@@ -49,7 +49,7 @@ ULEB128.h
 #
 # Class files
 #
-ObjCDumper_OBJC_FILES = \
+MachObjC_OBJC_FILES = \
 CDTopoSortNode.m\
 NSArray-CDExtensions.m\
 NSData-CDExtensions.m\
@@ -118,25 +118,23 @@ ULEB128.m
 #
 # Other sources
 #
-ObjCDumper_C_FILES = \
+MachObjC_C_FILES = \
 blowfish.c
 
-ObjCDumper_OBJC_FILES +=
+MachObjC_OBJC_FILES +=
 
 #
 # precompile header
 #
-ObjCDumper_OBJC_PRECOMPILED_HEADERS = MachObjC-Prefix.pch 
+MachObjC_OBJC_PRECOMPILED_HEADERS = MachObjC-Prefix.pch 
 
 
 #
 # Makefiles
 #
 -include GNUmakefile.preamble
-include $(GNUSTEP_MAKEFILES)/aggregate.make
-include $(GNUSTEP_MAKEFILES)/tool.make
+# include $(GNUSTEP_MAKEFILES)/aggregate.make
+include $(GNUSTEP_MAKEFILES)/library.make
 -include GNUmakefile.postamble
-
-include $(GNUSTEP_MAKEFILES)/common.make
 
 

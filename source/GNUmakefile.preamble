@@ -12,7 +12,7 @@ ADDITIONAL_OBJCFLAGS += -include MachObjC-Prefix.pch -Winvalid-pch -fobjc-arc -f
 ADDITIONAL_CFLAGS += 
 
 # Additional flags to pass to the linker
-ADDITIONAL_LDFLAGS += -lm -lssl -lcrypto -lgnustep-base -lobjc -ldispatch 
+ADDITIONAL_LDFLAGS += -lm -lssl -lcrypto -lobjc -ldispatch 
 
 # Additional include directories the compiler should search
 ADDITIONAL_INCLUDE_DIRS += -I../dependence/include 
