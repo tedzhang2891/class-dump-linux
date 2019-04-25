@@ -310,6 +310,8 @@ NSString *CDSegmentEncryptionTypeName(CDSegmentEncryptionType type)
                 }
 #endif
             } else if (magic == CDSegmentProtectedMagic_AES) {
+		// TODO: implement AES decrypt argo on linux 
+#if 0
                 // 10.5 decryption
                 CCCryptorRef cryptor1, cryptor2;
                 CCCryptorStatus status;
@@ -345,6 +347,7 @@ NSString *CDSegmentEncryptionTypeName(CDSegmentEncryptionType type)
 
                 CCCryptorRelease(cryptor1);
                 CCCryptorRelease(cryptor2);
+#endif
             } else {
                 NSLog(@"Unknown encryption type: 0x%08x", magic);
                 exit(99);

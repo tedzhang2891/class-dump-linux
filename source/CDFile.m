@@ -29,7 +29,9 @@ NSString *CDImportNameForPath(NSString *path)
 
 NSString *CDNameForCPUType(cpu_type_t cputype, cpu_subtype_t cpusubtype)
 {
-    const NXArchInfo *archInfo = NXGetArchInfoFromCpuType(cputype, cpusubtype);
+    // TODO: implement NXGetArchInfoFromCpuType in Linux. (Ted)
+    //const NXArchInfo *archInfo = NXGetArchInfoFromCpuType(cputype, cpusubtype);
+    const NXArchInfo *archInfo = NULL; 
     if (archInfo != NULL)
         return [NSString stringWithUTF8String:archInfo->name];
 
@@ -64,7 +66,9 @@ CDArch CDArchFromName(NSString *name)
     if (name == nil)
         return arch;
 
-    const NXArchInfo *archInfo = NXGetArchInfoFromName([name UTF8String]);
+    // TODO: implement NXGetArchInfoFromName in Linux. (Ted)
+    //const NXArchInfo *archInfo = NXGetArchInfoFromName([name UTF8String]);
+    const NXArchInfo *archInfo = NULL;
     if (archInfo == NULL) {
         if ([name isEqualToString:@"armv7s"]) { // Not recognized in 10.8.4
             arch.cputype    = CPU_TYPE_ARM;
@@ -153,7 +157,9 @@ BOOL CDArchUses64BitLibraries(CDArch arch)
 
 - (BOOL)bestMatchForLocalArch:(CDArch *)oArchPtr;
 {
-    const NXArchInfo *archInfo = NXGetLocalArchInfo();
+    // TODO: implement NXGetLocalArchInfo in Linux. (Ted)
+    //const NXArchInfo *archInfo = NXGetLocalArchInfo();
+    const NXArchInfo *archInfo = NULL;
     if (archInfo == NULL)
         return NO;
     
