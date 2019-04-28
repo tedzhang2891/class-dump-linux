@@ -21,6 +21,7 @@ include $(GNUSTEP_MAKEFILES)/common.make
 VERSION = 0.1
 PACKAGE_NAME = MachObjC
 LIBRARY_NAME = MachObjC
+TOOL_NAME = classdump 
 MachObjC_TOOL_ICON =
 
 
@@ -115,6 +116,7 @@ CDLCSourceVersion.m\
 CDLCDataInCode.m\
 CDProtocolUniquer.m\
 ULEB128.m
+
 #
 # Other sources
 #
@@ -130,11 +132,52 @@ MachObjC_OBJC_PRECOMPILED_HEADERS = MachObjC-Prefix.pch
 
 
 #
+# Resource files
+#
+classdump_RESOURCE_FILES = 
+
+#
+# Header files
+#
+classdump_HEADER_FILES = 
+
+#
+# Class files
+#
+classdump_OBJC_FILES = \
+CDClassDump.m \
+CDStructureTable.m \
+CDTypeController.m \
+CDStructureInfo.m \
+CDClassDumpVisitor.m \
+CDFindMethodVisitor.m \
+CDVisitor.m \
+CDClassFrameworkVisitor.m \
+CDMultiFileVisitor.m \
+CDTextClassDumpVisitor.m \
+CDSearchPathState.m \
+classdump.m 
+
+#
+# Other sources
+#
+classdump_C_FILES = 
+
+classdump_OBJC_FILES +=
+
+#
+# precompile header
+#
+classdump_OBJC_PRECOMPILED_HEADERS = classdump-Prefix.pch
+
+
+#
 # Makefiles
 #
--include GNUmakefile.preamble
-# include $(GNUSTEP_MAKEFILES)/aggregate.make
+-include GNUmakefile_MachObjC.preamble
 include $(GNUSTEP_MAKEFILES)/library.make
--include GNUmakefile.postamble
+-include GNUmakefile_MachObjC.postamble
 
-
+-include GNUmakefile_classdump.preamble
+include $(GNUSTEP_MAKEFILES)/tool.make
+-include GNUmakefile_classdump.postamble

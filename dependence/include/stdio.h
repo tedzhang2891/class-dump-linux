@@ -63,10 +63,18 @@
 
 #include <_stdio.h>
 
+/*
 __BEGIN_DECLS
 extern FILE *__stdinp;
 extern FILE *__stdoutp;
 extern FILE *__stderrp;
+__END_DECLS
+*/
+
+__BEGIN_DECLS
+extern FILE *stdin;
+extern FILE *stdout;
+extern FILE *stderr;
 __END_DECLS
 
 #define	__SLBF	0x0001		/* line buffered */
@@ -124,9 +132,15 @@ __END_DECLS
 #define	SEEK_END	2	/* set file offset to EOF plus offset */
 #endif
 
+/* FIX by Ted. for pass compile.
 #define	stdin	__stdinp
 #define	stdout	__stdoutp
 #define	stderr	__stderrp
+*/
+
+#define	stdin	stdin
+#define	stdout	stdout
+#define	stderr	stderr
 
 #ifdef _DARWIN_UNLIMITED_STREAMS
 #if defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_3_2
