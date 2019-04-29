@@ -159,11 +159,12 @@ BOOL CDArchUses64BitLibraries(CDArch arch)
 {
     // TODO: implement NXGetLocalArchInfo in Linux. (Ted)
     //const NXArchInfo *archInfo = NXGetLocalArchInfo();
-    const NXArchInfo *archInfo = NULL;
-    if (archInfo == NULL)
-        return NO;
+    //const NXArchInfo *archInfo = NULL;
+    //if (archInfo == NULL)
+    //    return NO;
     
-    CDArch arch = { archInfo->cputype, archInfo->cpusubtype };
+    //CDArch arch = { archInfo->cputype, archInfo->cpusubtype };
+    CDArch arch = { 7, 8 };
     
     if ([self bestMatchForArch:&arch]) {
         if (oArchPtr != NULL)
